@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { AddReadingSessionDialog } from "@/components/add-reading-session-dialog";
+import { MonthlyRecapButton } from "@/components/dashboard-client";
 
 export default async function DashboardPage() {
   // Fetch dashboard data
@@ -76,6 +77,7 @@ export default async function DashboardPage() {
           <p className="text-muted-foreground">Welcome back to your reading journey</p>
         </div>
         <div className="flex gap-2">
+          <MonthlyRecapButton />
           <AddReadingSessionDialog
             books={unfinishedBooks}
             trigger={
