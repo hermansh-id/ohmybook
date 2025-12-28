@@ -42,28 +42,60 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
       const scanner = new Html5Qrcode("barcode-reader");
       scannerRef.current = scanner;
 
-      await scanner.start(
-        { facingMode: "environment" }, // Use back camera on mobile
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 150 },
-          // Scanner will automatically detect EAN-13, EAN-8, UPC-A, UPC-E and other barcode formats
-        },
-        (decodedText) => {
-          // Successfully scanned a barcode
-          // Prevent multiple scans
-          if (hasScannedRef.current) return;
-          hasScannedRef.current = true;
+      // Try to get the back camera on mobile devices
+      // iOS Safari is picky about camera constraints
+      const cameraConfig = {
+        facingMode: { exact: "environment" }
+      };
 
-          onScan(decodedText);
-          stopScanning();
-          onClose();
-        },
-        (errorMessage) => {
-          // Scanning in progress, errors are normal here
-          // Don't show these to the user
-        }
-      );
+      try {
+        // First try with exact environment (back camera)
+        await scanner.start(
+          cameraConfig,
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 150 },
+            aspectRatio: 1.777778, // 16:9 aspect ratio works better on mobile
+            // Scanner will automatically detect EAN-13, EAN-8, UPC-A, UPC-E and other barcode formats
+          },
+          (decodedText) => {
+            // Successfully scanned a barcode
+            // Prevent multiple scans
+            if (hasScannedRef.current) return;
+            hasScannedRef.current = true;
+
+            onScan(decodedText);
+            stopScanning();
+            onClose();
+          },
+          () => {
+            // Scanning in progress, errors are normal here
+            // Don't show these to the user
+          }
+        );
+      } catch (exactError) {
+        console.log("Exact facingMode failed, trying ideal:", exactError);
+        // If exact fails (some devices don't support it), try with ideal
+        await scanner.start(
+          { facingMode: "environment" },
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 150 },
+            aspectRatio: 1.777778,
+          },
+          (decodedText) => {
+            if (hasScannedRef.current) return;
+            hasScannedRef.current = true;
+
+            onScan(decodedText);
+            stopScanning();
+            onClose();
+          },
+          () => {
+            // Scanning in progress
+          }
+        );
+      }
 
       setHasPermission(true);
     } catch (err: any) {
@@ -75,8 +107,14 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
       } else if (err.name === "NotFoundError" || err.toString().includes("No camera found")) {
         setError("No camera found on this device.");
         setHasPermission(false);
+      } else if (err.name === "NotReadableError" || err.toString().includes("not readable")) {
+        setError("Camera is being used by another app. Please close other apps and try again.");
+        setHasPermission(false);
+      } else if (err.name === "OverconstrainedError") {
+        setError("Camera configuration not supported on this device. Please try a different device.");
+        setHasPermission(false);
       } else {
-        setError("Failed to start camera. Please try again.");
+        setError(`Failed to start camera: ${err.message || "Unknown error"}. Please try again.`);
       }
 
       setIsScanning(false);
@@ -150,12 +188,15 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
 
           {/* Instructions */}
           {isScanning && !error && (
-            <div className="mt-4 text-center">
+            <div className="mt-4 text-center space-y-2">
               <p className="text-sm text-muted-foreground">
                 Position the barcode within the frame
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 ISBN barcodes are usually on the back cover
+              </p>
+              <p className="text-xs text-muted-foreground">
+                📱 iPhone users: Make sure you're using Safari and allowed camera access
               </p>
             </div>
           )}
