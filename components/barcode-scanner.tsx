@@ -47,13 +47,7 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
         {
           fps: 10,
           qrbox: { width: 250, height: 150 },
-          formatsToSupport: [
-            0, // EAN-13 (most common for ISBNs)
-            1, // EAN-8
-            2, // UPC-A
-            3, // UPC-E
-            // Also support Code-128 which some books use
-          ],
+          // Scanner will automatically detect EAN-13, EAN-8, UPC-A, UPC-E and other barcode formats
         },
         (decodedText) => {
           // Successfully scanned a barcode
