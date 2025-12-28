@@ -544,7 +544,7 @@ export function MonthlyRecap({ data, isOpen, onClose }: MonthlyRecapProps) {
 
       {/* Off-screen shareable card for image generation */}
       <div className="fixed -left-[9999px] -top-[9999px]">
-        <ShareableRecapCard ref={shareableCardRef} data={data} type="post" />
+        <ShareableRecapCard ref={shareableCardRef} data={data} />
       </div>
     </div>
   );

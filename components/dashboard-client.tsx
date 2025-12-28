@@ -41,7 +41,9 @@ export function MonthlyRecapButton() {
 
   const generateShareableImage = async () => {
     // Load data first if not loaded
-    if (!recapData) {
+    let dataToUse = recapData;
+
+    if (!dataToUse) {
       setIsLoading(true);
       try {
         const now = new Date();
@@ -56,6 +58,7 @@ export function MonthlyRecapButton() {
         }
 
         setRecapData(data);
+        dataToUse = data; // Use the loaded data directly
       } catch (error) {
         toast.error("Failed to load monthly recap");
         return;
@@ -78,8 +81,14 @@ export function MonthlyRecapButton() {
     try {
       const dataUrl = await toPng(shareableCardRef.current, {
         quality: 0.95,
-        pixelRatio: 2,
+        pixelRatio: 1,
         backgroundColor: "#0f2027",
+        width: 1080,
+        height: 1920,
+        style: {
+          transform: "scale(1)",
+          transformOrigin: "top left",
+        },
       });
 
       // Convert data URL to blob
@@ -89,7 +98,7 @@ export function MonthlyRecapButton() {
       // Download the image
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.download = `reading-recap-${recapData!.month}-${recapData!.year}.png`;
+      link.download = `reading-recap-${dataToUse.month}-${dataToUse.year}.png`;
       link.href = url;
       link.click();
 
@@ -143,7 +152,7 @@ export function MonthlyRecapButton() {
 
           {/* Off-screen card for image generation */}
           <div className="fixed -left-[9999px] -top-[9999px] pointer-events-none">
-            <ShareableRecapCard ref={shareableCardRef} data={recapData} type="post" />
+            <ShareableRecapCard ref={shareableCardRef} data={recapData} />
           </div>
         </>
       )}
