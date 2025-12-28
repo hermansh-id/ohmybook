@@ -4,10 +4,8 @@ import * as React from "react"
 import {
   IconChartDots3,
   IconDashboard,
-  IconHelp,
   IconInnerShadowTop,
   IconSettings,
-  IconSearch,
   IconUsers,
   IconBook,
   IconCalendar,
@@ -80,18 +78,8 @@ const data = {
   secondaryNav: [
     {
       title: "Settings",
-      url: "#",
+      url: "/dashboard/settings",
       icon: IconSettings,
-    },
-    {
-      title: "Get Help",
-      url: "#",
-      icon: IconHelp,
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: IconSearch,
     },
   ],
 }

@@ -45,16 +45,26 @@ export function AddReadingSessionForm({ books, onSuccess }: AddReadingSessionFor
       queryClient.invalidateQueries({ queryKey: ["reading-sessions"] });
 
       if (result.bookCompleted) {
-        toast.success("🎉 Book completed! Would you like to rate it?", {
-          action: {
-            label: "Rate Book",
-            onClick: () => {
-              // Navigate to book details or show rating dialog
-              // We'll implement this in the next step
+        const toastMessage = `🎉 "${result.bookTitle}" completed!`;
+
+        // Show toast with Goodreads link if available
+        if (result.goodreadsUrl) {
+          const goodreadsUrl = result.goodreadsUrl;
+          toast.success(toastMessage, {
+            description: "Mark it as read on Goodreads",
+            action: {
+              label: "Open Goodreads",
+              onClick: () => {
+                window.open(goodreadsUrl, "_blank");
+              },
             },
-          },
-          duration: 5000,
-        });
+            duration: 7000,
+          });
+        } else {
+          toast.success(toastMessage, {
+            duration: 5000,
+          });
+        }
       } else {
         toast.success("Reading session added!");
       }

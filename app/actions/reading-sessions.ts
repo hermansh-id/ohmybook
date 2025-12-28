@@ -48,9 +48,13 @@ export async function createReadingSessionAction(data: {
       sessionDate: new Date(data.sessionDate),
     });
 
-    // Get the book to check total pages
+    // Get the book to check total pages and goodreads URL
     const [book] = await db
-      .select({ pages: books.pages })
+      .select({
+        pages: books.pages,
+        title: books.title,
+        goodreadsUrl: books.goodreadsUrl,
+      })
       .from(books)
       .where(eq(books.bookId, data.bookId))
       .limit(1);
@@ -116,7 +120,8 @@ export async function createReadingSessionAction(data: {
       success: true,
       data: session[0],
       bookCompleted: isCompleted,
-      bookTitle: "", // We'll add this in the next update
+      bookTitle: book.title,
+      goodreadsUrl: book.goodreadsUrl || null,
     };
   } catch (error) {
     console.error("Error creating reading session:", error);
