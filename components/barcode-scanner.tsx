@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { X, Camera } from "lucide-react";
+import { X, Camera, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +14,9 @@ interface BarcodeScannerProps {
 
 export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const hasScannedRef = useRef(false);
@@ -158,6 +160,58 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
     setIsScanning(false);
   }
 
+  async function captureAndProcess() {
+    // Get the video element from the scanner
+    const videoElement = document.querySelector("#barcode-reader video") as HTMLVideoElement;
+
+    if (!videoElement) {
+      setError("Camera not ready. Please wait a moment and try again.");
+      return;
+    }
+
+    try {
+      setIsCapturing(true);
+      setError(null);
+
+      // Create a canvas to capture the current frame
+      const canvas = document.createElement("canvas");
+      canvas.width = videoElement.videoWidth;
+      canvas.height = videoElement.videoHeight;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("Could not get canvas context");
+      }
+
+      // Draw the current video frame to canvas
+      ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+      // Convert canvas to blob
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => {
+          if (b) resolve(b);
+          else reject(new Error("Failed to create blob"));
+        }, "image/jpeg", 0.95);
+      });
+
+      // Create a File from the blob
+      const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+
+      // Use Html5Qrcode to scan the captured image
+      const tempScanner = new Html5Qrcode("barcode-reader-temp");
+      const result = await tempScanner.scanFile(file, false);
+
+      // Successfully scanned
+      onScan(result);
+      stopScanning();
+      onClose();
+    } catch (err: any) {
+      setError("Could not detect barcode in captured image. Try adjusting position and lighting.");
+    } finally {
+      setIsCapturing(false);
+    }
+  }
+
   if (!isOpen) return null;
 
   return (
@@ -182,6 +236,9 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
             </Button>
           </div>
 
+          {/* Hidden temp div for image scanning */}
+          <div id="barcode-reader-temp" className="hidden" />
+
           {/* Scanner Area */}
           <div className="relative overflow-hidden rounded-lg border">
             <div id="barcode-reader" className={cn("w-full", error && "hidden")} />
@@ -196,22 +253,37 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
                 )}
               </div>
             )}
+
+            {/* Capture Button Overlay */}
+            {isScanning && !error && (
+              <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                <Button
+                  onClick={captureAndProcess}
+                  disabled={isCapturing}
+                  size="lg"
+                  className="shadow-lg"
+                >
+                  <ScanLine className="mr-2 h-5 w-5" />
+                  {isCapturing ? "Processing..." : "Capture & Scan"}
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Instructions */}
           {isScanning && !error && (
             <div className="mt-4 text-center space-y-1">
               <p className="text-sm font-medium text-muted-foreground">
-                Position the barcode within the frame
+                Position barcode in frame, then click "Capture & Scan"
               </p>
               <p className="text-xs text-muted-foreground">
                 📚 ISBN barcodes are usually on the back cover
               </p>
               <p className="text-xs text-muted-foreground">
-                💡 Tips: Hold steady, ensure good lighting, keep barcode flat
+                💡 Tips: Good lighting, keep barcode flat and clear
               </p>
               <p className="text-xs text-muted-foreground">
-                📱 iPhone: Use Safari browser for best results
+                📱 Works better on iPhone than auto-scanning!
               </p>
             </div>
           )}
