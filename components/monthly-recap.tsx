@@ -2,11 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { MonthlyRecapData } from "@/app/actions/reading-recap";
-import { X, ChevronLeft, ChevronRight, BookOpen, Star, Zap, Trophy, Calendar, Sparkles, Share2, Download } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, BookOpen, Star, Zap, Trophy, Calendar, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ShareableRecapCard } from "@/components/shareable-recap-card";
-import html2canvas from "html2canvas";
-import { toast } from "sonner";
 
 // Counter animation hook
 function useCounter(end: number, duration: number = 2000, isActive: boolean = false) {
@@ -82,54 +80,10 @@ export function MonthlyRecap({ data, isOpen, onClose }: MonthlyRecapProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const shareableCardRef = useRef<HTMLDivElement>(null);
 
   const booksCount = useCounter(data.booksFinished, 2000, currentSlide === 1);
   const pagesCount = useCounter(data.pagesRead, 2500, currentSlide === 1);
-
-  const generateShareableImage = async (type: "post" | "story" = "post") => {
-    if (!shareableCardRef.current) return;
-
-    setIsGeneratingImage(true);
-    toast.info("Generating image...");
-
-    try {
-      // Wait a bit for the card to render
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      const canvas = await html2canvas(shareableCardRef.current, {
-        scale: 2, // Higher quality
-        useCORS: true,
-        logging: false,
-        backgroundColor: null,
-      });
-
-      // Convert canvas to blob
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          toast.error("Failed to generate image");
-          return;
-        }
-
-        // Create download link
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.download = `reading-recap-${data.month}-${data.year}.png`;
-        link.href = url;
-        link.click();
-
-        // Cleanup
-        URL.revokeObjectURL(url);
-        toast.success("Image downloaded!");
-      }, "image/png");
-    } catch (error) {
-      console.error("Error generating image:", error);
-      toast.error("Failed to generate image");
-    } finally {
-      setIsGeneratingImage(false);
-    }
-  };
 
   const slides = [
     // Slide 1: Welcome
@@ -413,30 +367,7 @@ export function MonthlyRecap({ data, isOpen, onClose }: MonthlyRecapProps) {
             )}
           </div>
 
-          {/* Share Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-8">
-            <Button
-              onClick={() => generateShareableImage("post")}
-              disabled={isGeneratingImage}
-              size="lg"
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-6 text-lg"
-            >
-              <Share2 className="mr-2 h-5 w-5" />
-              {isGeneratingImage ? "Generating..." : "Share to Instagram"}
-            </Button>
-            <Button
-              onClick={() => generateShareableImage("story")}
-              disabled={isGeneratingImage}
-              size="lg"
-              variant="outline"
-              className="bg-white/10 hover:bg-white/20 text-white border-white/30 px-8 py-6 text-lg backdrop-blur-sm"
-            >
-              <Download className="mr-2 h-5 w-5" />
-              Download Story
-            </Button>
-          </div>
-
-          <p className="text-lg text-white/60">
+          <p className="text-lg text-white/60 mt-12">
             {data.month} {data.year}
           </p>
         </div>

@@ -76,6 +76,9 @@ export default async function DashboardPage() {
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">Welcome back to your reading journey</p>
         </div>
+      </div>
+      <div className="flex items-center justify-between">
+
         <div className="flex gap-2">
           <MonthlyRecapButton />
           <AddReadingSessionDialog
