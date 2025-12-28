@@ -7,6 +7,7 @@ import {
   getAuthorsWithStats,
   getGenresWithStats,
   getReadingSessions,
+  getLibraryStats,
 } from "@/lib/db/queries";
 import {
   BookOpen,
@@ -17,16 +18,20 @@ import {
   Clock,
   Calendar,
   Award,
+  Library,
+  Users,
+  Tags,
 } from "lucide-react";
 
 export default async function StatisticsPage() {
-  const [stats, goal, monthlyStats, authors, genres, sessions] = await Promise.all([
+  const [stats, goal, monthlyStats, authors, genres, sessions, libraryStats] = await Promise.all([
     getReadingStats(),
     getCurrentYearGoal(),
     getMonthlyStats(new Date().getFullYear()),
     getAuthorsWithStats(),
     getGenresWithStats(),
     getReadingSessions(100),
+    getLibraryStats(),
   ]);
 
   const readingStats = stats[0] || {
@@ -84,6 +89,55 @@ export default async function StatisticsPage() {
           Overview of your reading journey
         </p>
       </div>
+
+      {/* Library Overview */}
+      <Card className="border-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Library className="h-5 w-5 text-primary" />
+            Library Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Total Books</p>
+              </div>
+              <p className="text-3xl font-bold">{libraryStats.totalBooks}</p>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Authors</p>
+              </div>
+              <p className="text-3xl font-bold">{libraryStats.totalAuthors}</p>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Tags className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Genres</p>
+              </div>
+              <p className="text-3xl font-bold">{libraryStats.totalGenres}</p>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Total Pages</p>
+              </div>
+              <p className="text-3xl font-bold">{libraryStats.totalPages.toLocaleString()}</p>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Avg Pages/Book</p>
+              </div>
+              <p className="text-3xl font-bold">{libraryStats.avgPages}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Overall Statistics */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

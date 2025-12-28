@@ -89,3 +89,35 @@ export const readingSessions = pgTable(
     dateIdx: index("idx_reading_sessions_date").on(table.sessionDate),
   })
 );
+
+// Book quotes and highlights
+export const bookQuotes = pgTable(
+  "book_quotes",
+  {
+    quoteId: serial("quote_id").primaryKey(),
+    bookId: integer("book_id")
+      .notNull()
+      .references(() => books.bookId, { onDelete: "cascade" }),
+
+    // Quote content
+    quoteText: text("quote_text").notNull(),
+    pageNumber: integer("page_number"),
+    chapter: varchar("chapter", { length: 255 }),
+
+    // Categorization
+    tags: text("tags").array(),
+    isFavorite: boolean("is_favorite").default(false),
+
+    // Personal notes about the quote
+    notes: text("notes"),
+
+    // Metadata
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => ({
+    bookIdx: index("idx_book_quotes_book").on(table.bookId),
+    favoriteIdx: index("idx_book_quotes_favorite").on(table.isFavorite),
+    createdAtIdx: index("idx_book_quotes_created").on(table.createdAt),
+  })
+);

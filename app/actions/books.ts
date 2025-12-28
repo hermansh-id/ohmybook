@@ -257,6 +257,23 @@ export async function updateBookAction(input: UpdateBookInput) {
   }
 }
 
+export async function getAllBooksAction() {
+  try {
+    const allBooks = await db
+      .select({
+        bookId: books.bookId,
+        title: books.title,
+      })
+      .from(books)
+      .orderBy(books.title);
+
+    return allBooks;
+  } catch (error) {
+    console.error("Error fetching books:", error);
+    return [];
+  }
+}
+
 export async function getAuthorsAction() {
   try {
     const allAuthors = await db

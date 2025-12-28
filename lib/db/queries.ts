@@ -21,8 +21,9 @@ import {
   yearlyStats,
   readingGoals,
   readingSessions,
+  bookQuotes,
 } from "./schema";
-import { eq, desc, and, sql, isNull } from "drizzle-orm";
+import { eq, desc, and, sql, isNull, like, or } from "drizzle-orm";
 
 // ============================================================================
 // BOOKS
@@ -252,6 +253,96 @@ export async function markBookAsFinished(
  */
 export async function getReadingStats() {
   return await db.select().from(readingStats).limit(1);
+}
+
+/**
+ * Get library completion statistics
+ */
+export async function getLibraryCompletion() {
+  // Get total books in library
+  const totalBooksResult = await db
+    .select({ count: sql<number>`COUNT(*)::int` })
+    .from(books);
+  const totalBooks = totalBooksResult[0]?.count || 0;
+
+  // Get total books read (all time)
+  const booksReadResult = await db
+    .select({ count: sql<number>`COUNT(DISTINCT ${readingLog.bookId})::int` })
+    .from(readingLog)
+    .where(eq(readingLog.status, "finished"));
+  const booksRead = booksReadResult[0]?.count || 0;
+
+  // Calculate percentage
+  const percentage = totalBooks > 0 ? Math.round((booksRead / totalBooks) * 100) : 0;
+
+  // Calculate average books per month (for estimation)
+  // Get first reading log date to calculate total months of reading
+  const firstReadingResult = await db
+    .select({ date: readingLog.dateFinished })
+    .from(readingLog)
+    .where(eq(readingLog.status, "finished"))
+    .orderBy(readingLog.dateFinished)
+    .limit(1);
+
+  let estimatedCompletionMonths: number | null = null;
+  if (firstReadingResult.length > 0 && booksRead > 0) {
+    const firstDate = new Date(firstReadingResult[0].date!);
+    const now = new Date();
+    const monthsReading = (now.getFullYear() - firstDate.getFullYear()) * 12 + (now.getMonth() - firstDate.getMonth()) + 1;
+    const avgBooksPerMonth = booksRead / monthsReading;
+    const booksRemaining = totalBooks - booksRead;
+    estimatedCompletionMonths = avgBooksPerMonth > 0 ? Math.ceil(booksRemaining / avgBooksPerMonth) : null;
+  }
+
+  return {
+    totalBooks,
+    booksRead,
+    percentage,
+    estimatedCompletionMonths,
+  };
+}
+
+/**
+ * Get library statistics (total counts)
+ */
+export async function getLibraryStats() {
+  // Get total books
+  const totalBooksResult = await db
+    .select({ count: sql<number>`COUNT(*)::int` })
+    .from(books);
+  const totalBooks = totalBooksResult[0]?.count || 0;
+
+  // Get total unique authors
+  const totalAuthorsResult = await db
+    .select({ count: sql<number>`COUNT(DISTINCT ${authors.authorId})::int` })
+    .from(authors)
+    .innerJoin(bookAuthors, eq(authors.authorId, bookAuthors.authorId));
+  const totalAuthors = totalAuthorsResult[0]?.count || 0;
+
+  // Get total unique genres
+  const totalGenresResult = await db
+    .select({ count: sql<number>`COUNT(DISTINCT ${genres.genreId})::int` })
+    .from(genres)
+    .innerJoin(bookGenres, eq(genres.genreId, bookGenres.genreId));
+  const totalGenres = totalGenresResult[0]?.count || 0;
+
+  // Get total pages in library and average pages
+  const pagesResult = await db
+    .select({
+      totalPages: sql<number>`COALESCE(SUM(${books.pages}), 0)::int`,
+      avgPages: sql<number>`COALESCE(ROUND(AVG(${books.pages})::numeric, 0), 0)::int`,
+    })
+    .from(books);
+  const totalPages = pagesResult[0]?.totalPages || 0;
+  const avgPages = pagesResult[0]?.avgPages || 0;
+
+  return {
+    totalBooks,
+    totalAuthors,
+    totalGenres,
+    totalPages,
+    avgPages,
+  };
 }
 
 /**
@@ -691,4 +782,345 @@ export async function getReadingHistory(months: number = 12) {
     )
     .groupBy(sql`DATE(${readingLog.dateFinished})`)
     .orderBy(sql`DATE(${readingLog.dateFinished})`);
+}
+
+// ============================================================================
+// READING STREAKS & ACTIVITY
+// ============================================================================
+
+/**
+ * Get daily reading activity for heatmap (last 365 days)
+ * Combines reading sessions and books finished
+ */
+export async function getDailyReadingActivity(days: number = 365) {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
+
+  // Get reading sessions activity
+  const sessionActivity = await db
+    .select({
+      date: sql<string>`DATE(${readingSessions.sessionDate})`,
+      pagesRead: sql<number>`COALESCE(SUM(${readingSessions.pagesRead}), 0)::int`,
+      minutesRead: sql<number>`COALESCE(SUM(${readingSessions.minutesRead}), 0)::int`,
+      sessionCount: sql<number>`COUNT(*)::int`,
+    })
+    .from(readingSessions)
+    .where(sql`${readingSessions.sessionDate} >= ${startDate.toISOString().split('T')[0]}`)
+    .groupBy(sql`DATE(${readingSessions.sessionDate})`)
+    .orderBy(sql`DATE(${readingSessions.sessionDate})`);
+
+  // Get books finished activity (for users who don't track sessions)
+  const finishedActivity = await db
+    .select({
+      date: sql<string>`DATE(${readingLog.dateFinished})`,
+      pagesRead: sql<number>`COALESCE(SUM(${books.pages}), 0)::int`,
+      booksFinished: sql<number>`COUNT(*)::int`,
+    })
+    .from(readingLog)
+    .leftJoin(books, eq(readingLog.bookId, books.bookId))
+    .where(
+      and(
+        eq(readingLog.status, "finished"),
+        sql`${readingLog.dateFinished} >= ${startDate.toISOString().split('T')[0]}`
+      )
+    )
+    .groupBy(sql`DATE(${readingLog.dateFinished})`)
+    .orderBy(sql`DATE(${readingLog.dateFinished})`);
+
+  // Merge both datasets
+  const activityMap = new Map<string, { date: string; pagesRead: number; minutesRead: number; sessionCount: number }>();
+
+  // Add session activity
+  sessionActivity.forEach(activity => {
+    activityMap.set(activity.date, {
+      date: activity.date,
+      pagesRead: activity.pagesRead,
+      minutesRead: activity.minutesRead,
+      sessionCount: activity.sessionCount,
+    });
+  });
+
+  // Add finished books activity (only if no session data for that day)
+  finishedActivity.forEach(activity => {
+    if (!activityMap.has(activity.date)) {
+      activityMap.set(activity.date, {
+        date: activity.date,
+        pagesRead: activity.pagesRead,
+        minutesRead: 0, // We don't track time for finished books without sessions
+        sessionCount: activity.booksFinished,
+      });
+    }
+  });
+
+  // Convert map back to array and sort
+  return Array.from(activityMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Calculate reading streaks
+ * Returns current streak and best streak
+ * Combines reading sessions and books finished
+ */
+export async function getReadingStreaks() {
+  // Get all unique reading dates (from sessions)
+  const sessionDates = await db
+    .select({
+      date: sql<string>`DATE(${readingSessions.sessionDate})`,
+    })
+    .from(readingSessions)
+    .groupBy(sql`DATE(${readingSessions.sessionDate})`);
+
+  // Get all unique finished book dates
+  const finishedDates = await db
+    .select({
+      date: sql<string>`DATE(${readingLog.dateFinished})`,
+    })
+    .from(readingLog)
+    .where(eq(readingLog.status, "finished"))
+    .groupBy(sql`DATE(${readingLog.dateFinished})`);
+
+  // Combine and deduplicate dates
+  const allDatesSet = new Set<string>();
+  sessionDates.forEach(d => allDatesSet.add(d.date));
+  finishedDates.forEach(d => d.date && allDatesSet.add(d.date));
+
+  if (allDatesSet.size === 0) {
+    return {
+      currentStreak: 0,
+      bestStreak: 0,
+      totalReadingDays: 0,
+    };
+  }
+
+  // Convert to sorted array (newest first)
+  const dates = Array.from(allDatesSet)
+    .map(d => new Date(d))
+    .sort((a, b) => b.getTime() - a.getTime());
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Calculate current streak
+  let currentStreak = 0;
+  let checkDate = new Date(today);
+
+  for (const date of dates) {
+    const readDate = new Date(date);
+    readDate.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.floor((checkDate.getTime() - readDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0 || diffDays === 1) {
+      currentStreak++;
+      checkDate = readDate;
+    } else {
+      break;
+    }
+  }
+
+  // Calculate best streak
+  let bestStreak = 0;
+  let tempStreak = 1;
+
+  for (let i = 0; i < dates.length - 1; i++) {
+    const currentDate = new Date(dates[i]);
+    const nextDate = new Date(dates[i + 1]);
+    currentDate.setHours(0, 0, 0, 0);
+    nextDate.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.floor((currentDate.getTime() - nextDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1) {
+      tempStreak++;
+    } else {
+      bestStreak = Math.max(bestStreak, tempStreak);
+      tempStreak = 1;
+    }
+  }
+  bestStreak = Math.max(bestStreak, tempStreak);
+
+  return {
+    currentStreak,
+    bestStreak,
+    totalReadingDays: dates.length,
+  };
+}
+
+// ============================================================================
+// BOOK QUOTES & HIGHLIGHTS
+// ============================================================================
+
+/**
+ * Get all quotes with book details
+ */
+export async function getAllQuotes(limit?: number) {
+  const query = db
+    .select({
+      quote: bookQuotes,
+      book: books,
+      authors: sql<string>`string_agg(DISTINCT ${authors.name}, ', ')`,
+    })
+    .from(bookQuotes)
+    .innerJoin(books, eq(bookQuotes.bookId, books.bookId))
+    .leftJoin(bookAuthors, eq(books.bookId, bookAuthors.bookId))
+    .leftJoin(authors, eq(bookAuthors.authorId, authors.authorId))
+    .groupBy(bookQuotes.quoteId, books.bookId)
+    .orderBy(desc(bookQuotes.createdAt));
+
+  if (limit) {
+    return await query.limit(limit);
+  }
+
+  return await query;
+}
+
+/**
+ * Get quotes for a specific book
+ */
+export async function getBookQuotes(bookId: number) {
+  return await db
+    .select()
+    .from(bookQuotes)
+    .where(eq(bookQuotes.bookId, bookId))
+    .orderBy(bookQuotes.pageNumber, desc(bookQuotes.createdAt));
+}
+
+/**
+ * Get favorite quotes
+ */
+export async function getFavoriteQuotes() {
+  return await db
+    .select({
+      quote: bookQuotes,
+      book: books,
+      authors: sql<string>`string_agg(DISTINCT ${authors.name}, ', ')`,
+    })
+    .from(bookQuotes)
+    .innerJoin(books, eq(bookQuotes.bookId, books.bookId))
+    .leftJoin(bookAuthors, eq(books.bookId, bookAuthors.bookId))
+    .leftJoin(authors, eq(bookAuthors.authorId, authors.authorId))
+    .where(eq(bookQuotes.isFavorite, true))
+    .groupBy(bookQuotes.quoteId, books.bookId)
+    .orderBy(desc(bookQuotes.createdAt));
+}
+
+/**
+ * Search quotes by text or tags
+ */
+export async function searchQuotes(query: string) {
+  return await db
+    .select({
+      quote: bookQuotes,
+      book: books,
+      authors: sql<string>`string_agg(DISTINCT ${authors.name}, ', ')`,
+    })
+    .from(bookQuotes)
+    .innerJoin(books, eq(bookQuotes.bookId, books.bookId))
+    .leftJoin(bookAuthors, eq(books.bookId, bookAuthors.bookId))
+    .leftJoin(authors, eq(bookAuthors.authorId, authors.authorId))
+    .where(
+      or(
+        sql`${bookQuotes.quoteText} ILIKE ${"%" + query + "%"}`,
+        sql`${bookQuotes.notes} ILIKE ${"%" + query + "%"}`,
+        sql`${"%" + query + "%"} = ANY(${bookQuotes.tags})`
+      )
+    )
+    .groupBy(bookQuotes.quoteId, books.bookId)
+    .orderBy(desc(bookQuotes.createdAt))
+    .limit(50);
+}
+
+/**
+ * Create a new quote
+ */
+export async function createQuote(data: {
+  bookId: number;
+  quoteText: string;
+  pageNumber?: number;
+  chapter?: string;
+  tags?: string[];
+  isFavorite?: boolean;
+  notes?: string;
+}) {
+  return await db.insert(bookQuotes).values(data).returning();
+}
+
+/**
+ * Update a quote
+ */
+export async function updateQuote(
+  quoteId: number,
+  data: {
+    quoteText?: string;
+    pageNumber?: number;
+    chapter?: string;
+    tags?: string[];
+    isFavorite?: boolean;
+    notes?: string;
+  }
+) {
+  return await db
+    .update(bookQuotes)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(bookQuotes.quoteId, quoteId))
+    .returning();
+}
+
+/**
+ * Delete a quote
+ */
+export async function deleteQuote(quoteId: number) {
+  return await db
+    .delete(bookQuotes)
+    .where(eq(bookQuotes.quoteId, quoteId))
+    .returning();
+}
+
+/**
+ * Toggle quote favorite status
+ */
+export async function toggleQuoteFavorite(quoteId: number) {
+  const quote = await db
+    .select()
+    .from(bookQuotes)
+    .where(eq(bookQuotes.quoteId, quoteId))
+    .limit(1);
+
+  if (quote.length === 0) {
+    throw new Error("Quote not found");
+  }
+
+  return await db
+    .update(bookQuotes)
+    .set({
+      isFavorite: !quote[0].isFavorite,
+      updatedAt: new Date(),
+    })
+    .where(eq(bookQuotes.quoteId, quoteId))
+    .returning();
+}
+
+/**
+ * Get quote statistics
+ */
+export async function getQuoteStats() {
+  const totalQuotes = await db
+    .select({ count: sql<number>`COUNT(*)::int` })
+    .from(bookQuotes);
+
+  const favoriteCount = await db
+    .select({ count: sql<number>`COUNT(*)::int` })
+    .from(bookQuotes)
+    .where(eq(bookQuotes.isFavorite, true));
+
+  const booksWithQuotes = await db
+    .select({ count: sql<number>`COUNT(DISTINCT ${bookQuotes.bookId})::int` })
+    .from(bookQuotes);
+
+  return {
+    totalQuotes: totalQuotes[0]?.count || 0,
+    favoriteQuotes: favoriteCount[0]?.count || 0,
+    booksWithQuotes: booksWithQuotes[0]?.count || 0,
+  };
 }

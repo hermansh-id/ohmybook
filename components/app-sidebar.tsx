@@ -12,6 +12,7 @@ import {
   IconNotebook,
   IconCategory,
   IconBulb,
+  IconQuote,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -58,6 +59,11 @@ const data = {
       title: "Recommendations",
       url: "/dashboard/recommendations",
       icon: IconBulb,
+    },
+    {
+      title: "Quotes",
+      url: "/dashboard/quotes",
+      icon: IconQuote,
     },
     {
       title: "Calendar",

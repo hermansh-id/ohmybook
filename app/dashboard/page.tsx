@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ReadingHistoryChart } from "@/components/reading-history-chart";
+import { ReadingHeatmap } from "@/components/reading-heatmap";
 import {
   getReadingStats,
   getCurrentYearGoal,
@@ -10,6 +11,9 @@ import {
   getCurrentlyReadingBooks,
   getReadingSessions,
   getReadingHistory,
+  getLibraryCompletion,
+  getDailyReadingActivity,
+  getReadingStreaks,
 } from "@/lib/db/queries";
 import { getUnfinishedBooksAction } from "@/app/actions/reading-sessions";
 import {
@@ -21,6 +25,7 @@ import {
   Star,
   FileText,
   Award,
+  Flame,
 } from "lucide-react";
 import Link from "next/link";
 import { AddReadingSessionDialog } from "@/components/add-reading-session-dialog";
@@ -28,7 +33,7 @@ import { MonthlyRecapButton } from "@/components/dashboard-client";
 
 export default async function DashboardPage() {
   // Fetch dashboard data
-  const [stats, goal, monthlyStats, recentBooksData, currentlyReading, recentSessions, readingHistory, unfinishedBooks] =
+  const [stats, goal, monthlyStats, recentBooksData, currentlyReading, recentSessions, readingHistory, unfinishedBooks, libraryCompletion, dailyActivity, streaks] =
     await Promise.all([
       getReadingStats(),
       getCurrentYearGoal(),
@@ -38,6 +43,9 @@ export default async function DashboardPage() {
       getReadingSessions(10),
       getReadingHistory(12),
       getUnfinishedBooksAction(),
+      getLibraryCompletion(),
+      getDailyReadingActivity(),
+      getReadingStreaks(),
     ]);
 
   const readingStats = stats[0] || {
@@ -141,8 +149,75 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
+      {/* Library Completion */}
+      <Card className="border-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-purple-600" />
+            Library Completion
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Progress Bar */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Progress</span>
+                <span className="font-semibold text-lg">
+                  {libraryCompletion.percentage}%
+                </span>
+              </div>
+              <div className="h-6 overflow-hidden rounded-full bg-secondary relative">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 transition-all"
+                  style={{ width: `${Math.min(libraryCompletion.percentage, 100)}%` }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xs font-bold text-foreground mix-blend-difference">
+                    {libraryCompletion.booksRead} / {libraryCompletion.totalBooks} books
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Books Read</p>
+                <p className="text-2xl font-bold">{libraryCompletion.booksRead}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Total Library</p>
+                <p className="text-2xl font-bold">{libraryCompletion.totalBooks}</p>
+              </div>
+            </div>
+
+            {/* Estimated Completion */}
+            {libraryCompletion.estimatedCompletionMonths !== null && libraryCompletion.estimatedCompletionMonths > 0 && (
+              <div className="pt-3 border-t">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Estimated to finish in</span>
+                  <Badge variant="secondary" className="bg-purple-100 text-purple-900 dark:bg-purple-950 dark:text-purple-100">
+                    {libraryCompletion.estimatedCompletionMonths} {libraryCompletion.estimatedCompletionMonths === 1 ? "month" : "months"}
+                  </Badge>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Reading Heatmap - Full Width */}
+      <div className="w-full">
+        <ReadingHeatmap
+          data={dailyActivity}
+          currentStreak={streaks.currentStreak}
+          bestStreak={streaks.bestStreak}
+        />
+      </div>
+
       {/* Quick Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -177,6 +252,24 @@ export default async function DashboardPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Current Streak</p>
+                <p className="text-2xl font-bold flex items-center gap-1">
+                  {streaks.currentStreak}
+                  {streaks.currentStreak > 0 && <Flame className="h-5 w-5 text-orange-500" />}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Best: {streaks.bestStreak} days
+                </p>
+              </div>
+              <Flame className="h-8 w-8 text-orange-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Reading Now</p>
                 <p className="text-2xl font-bold">{readingStats.totalBooksReading}</p>
                 <p className="text-xs text-muted-foreground">
@@ -192,10 +285,10 @@ export default async function DashboardPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Reading Time</p>
-                <p className="text-2xl font-bold">{Math.floor(totalReadingTime / 60)}h</p>
+                <p className="text-sm text-muted-foreground">Reading Days</p>
+                <p className="text-2xl font-bold">{streaks.totalReadingDays}</p>
                 <p className="text-xs text-muted-foreground">
-                  {totalReadingTime % 60}m last 10 sessions
+                  {Math.floor(totalReadingTime / 60)}h {totalReadingTime % 60}m total
                 </p>
               </div>
               <Clock className="h-8 w-8 text-muted-foreground" />
