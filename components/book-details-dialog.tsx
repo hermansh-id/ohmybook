@@ -95,8 +95,13 @@ export function BookDetailsDialog({
   });
 
   const handleMarkAsFinished = () => {
-    if (!book || !selectedRating) {
-      toast.error("Please select a rating");
+    if (!book) {
+      toast.error("Book data not available");
+      return;
+    }
+
+    if (!selectedRating || selectedRating < 1 || selectedRating > 5) {
+      toast.error("Please select a rating (1-5)");
       return;
     }
 
@@ -371,8 +376,8 @@ export function BookDetailsDialog({
                 </>
               )}
 
-              {/* Mark as Finished - Mobile-first design */}
-              {book.status !== "finished" && (
+              {/* Mark as Finished / Update Rating - Mobile-first design */}
+              {book.status !== "finished" ? (
                 <>
                   <Separator />
                   <div className="rounded-lg border bg-muted/50 p-4">
@@ -415,6 +420,71 @@ export function BookDetailsDialog({
                         className="w-full sm:w-auto"
                       >
                         {updateMutation.isPending ? "Saving..." : "Mark as Finished"}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Separator />
+                  <div className="rounded-lg border bg-muted/50 p-4">
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <Star className="h-4 w-4" />
+                      {book.rating ? "Update Rating" : "Add Rating"}
+                    </h3>
+                    <div className="space-y-4">
+                      {/* Rating Selector - Mobile-first */}
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">
+                          Your Rating {book.rating && `(Current: ${book.rating}/5)`}
+                        </label>
+                        <div className="flex gap-2 flex-wrap">
+                          {[1, 2, 3, 4, 5].map((rating) => (
+                            <button
+                              key={rating}
+                              onClick={() => setSelectedRating(rating)}
+                              className={`flex items-center gap-1 px-4 py-2 rounded-md border transition-colors min-w-[60px] justify-center ${
+                                selectedRating === rating
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-background hover:bg-muted"
+                              }`}
+                            >
+                              <Star
+                                className={`h-4 w-4 ${
+                                  selectedRating === rating ? "fill-current" : ""
+                                }`}
+                              />
+                              <span>{rating}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Submit Button */}
+                      <Button
+                        onClick={() => {
+                          if (!book) {
+                            toast.error("Book data not available");
+                            return;
+                          }
+
+                          if (!selectedRating || selectedRating < 1 || selectedRating > 5) {
+                            toast.error("Please select a rating (1-5)");
+                            return;
+                          }
+
+                          updateMutation.mutate({
+                            bookId: book.id,
+                            logId: book.logId,
+                            status: "finished",
+                            rating: selectedRating,
+                            dateFinished: book.dateFinished ? new Date(book.dateFinished) : new Date(),
+                          });
+                        }}
+                        disabled={!selectedRating || updateMutation.isPending}
+                        className="w-full sm:w-auto"
+                      >
+                        {updateMutation.isPending ? "Saving..." : book.rating ? "Update Rating" : "Add Rating"}
                       </Button>
                     </div>
                   </div>

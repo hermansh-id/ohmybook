@@ -122,7 +122,7 @@ export async function updateBookStatusAction(data: {
 
     // If marking as finished, use special function
     if (data.status === "finished") {
-      return await markBookAsFinished(data.logId, data.rating || undefined);
+      return await markBookAsFinished(data.logId, data.rating ?? undefined);
     }
 
     // Otherwise, update the reading status
