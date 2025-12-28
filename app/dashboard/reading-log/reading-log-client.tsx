@@ -8,7 +8,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -19,9 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Plus,
   BookOpen,
@@ -30,8 +26,9 @@ import {
   Trash2,
   Calendar as CalendarIcon,
 } from "lucide-react";
-import { createReadingSessionAction, deleteReadingSessionAction } from "@/app/actions/reading-sessions";
+import { deleteReadingSessionAction } from "@/app/actions/reading-sessions";
 import { useRouter } from "next/navigation";
+import { AddReadingSessionForm } from "@/components/add-reading-session-form";
 
 interface ReadingSession {
   session: {
@@ -51,36 +48,26 @@ interface ReadingSession {
   authors: string;
 }
 
-interface Book {
+interface UnfinishedBook {
   id: number;
   title: string;
-  authors: { name: string }[];
+  pages: number;
+  currentPage: number;
+  status: string;
 }
 
 interface ReadingLogClientProps {
   initialSessions: ReadingSession[];
-  availableBooks: Book[];
+  unfinishedBooks: UnfinishedBook[];
 }
 
 export function ReadingLogClient({
   initialSessions,
-  availableBooks,
+  unfinishedBooks,
 }: ReadingLogClientProps) {
   const router = useRouter();
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [filterBookId, setFilterBookId] = useState<string>("all");
-
-  // Form state
-  const [formData, setFormData] = useState({
-    bookId: "",
-    sessionDate: new Date().toISOString().split("T")[0],
-    pagesRead: "",
-    minutesRead: "",
-    startPage: "",
-    endPage: "",
-    notes: "",
-  });
 
   // Calculate statistics
   const stats = {
@@ -105,51 +92,6 @@ export function ReadingLogClient({
       : initialSessions.filter(
           (s) => s.session.bookId.toString() === filterBookId
         );
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.bookId || !formData.sessionDate) {
-      alert("Please select a book and date");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const result = await createReadingSessionAction({
-        bookId: parseInt(formData.bookId),
-        sessionDate: formData.sessionDate,
-        pagesRead: formData.pagesRead ? parseInt(formData.pagesRead) : undefined,
-        minutesRead: formData.minutesRead
-          ? parseInt(formData.minutesRead)
-          : undefined,
-        startPage: formData.startPage ? parseInt(formData.startPage) : undefined,
-        endPage: formData.endPage ? parseInt(formData.endPage) : undefined,
-        notes: formData.notes || undefined,
-      });
-
-      if (result.success) {
-        setShowAddDialog(false);
-        setFormData({
-          bookId: "",
-          sessionDate: new Date().toISOString().split("T")[0],
-          pagesRead: "",
-          minutesRead: "",
-          startPage: "",
-          endPage: "",
-          notes: "",
-        });
-        router.refresh();
-      } else {
-        alert(result.error || "Failed to add reading session");
-      }
-    } catch (error) {
-      alert("An error occurred");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleDelete = async (sessionId: number) => {
     if (!confirm("Are you sure you want to delete this session?")) return;
@@ -229,7 +171,7 @@ export function ReadingLogClient({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Books</SelectItem>
-                {availableBooks.map((book) => (
+                {unfinishedBooks.map((book) => (
                   <SelectItem key={book.id} value={book.id.toString()}>
                     {book.title}
                   </SelectItem>
@@ -318,125 +260,17 @@ export function ReadingLogClient({
           <DialogHeader>
             <DialogTitle>Add Reading Session</DialogTitle>
             <DialogDescription>
-              Log your reading session for today
+              Track your reading for today with sliders
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="book">Book *</Label>
-              <Select
-                value={formData.bookId}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, bookId: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a book" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableBooks.map((book) => (
-                    <SelectItem key={book.id} value={book.id.toString()}>
-                      {book.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="date">Date *</Label>
-              <Input
-                id="date"
-                type="date"
-                value={formData.sessionDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, sessionDate: e.target.value })
-                }
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="pages">Pages Read</Label>
-                <Input
-                  id="pages"
-                  type="number"
-                  placeholder="e.g. 50"
-                  value={formData.pagesRead}
-                  onChange={(e) =>
-                    setFormData({ ...formData, pagesRead: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="minutes">Minutes</Label>
-                <Input
-                  id="minutes"
-                  type="number"
-                  placeholder="e.g. 60"
-                  value={formData.minutesRead}
-                  onChange={(e) =>
-                    setFormData({ ...formData, minutesRead: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startPage">Start Page</Label>
-                <Input
-                  id="startPage"
-                  type="number"
-                  placeholder="e.g. 1"
-                  value={formData.startPage}
-                  onChange={(e) =>
-                    setFormData({ ...formData, startPage: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="endPage">End Page</Label>
-                <Input
-                  id="endPage"
-                  type="number"
-                  placeholder="e.g. 50"
-                  value={formData.endPage}
-                  onChange={(e) =>
-                    setFormData({ ...formData, endPage: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                placeholder="Any thoughts or notes..."
-                value={formData.notes}
-                onChange={(e) =>
-                  setFormData({ ...formData, notes: e.target.value })
-                }
-                rows={3}
-              />
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowAddDialog(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Adding..." : "Add Session"}
-              </Button>
-            </DialogFooter>
-          </form>
+          <AddReadingSessionForm
+            books={unfinishedBooks}
+            onSuccess={() => {
+              setShowAddDialog(false);
+              router.refresh();
+            }}
+          />
         </DialogContent>
       </Dialog>
     </div>

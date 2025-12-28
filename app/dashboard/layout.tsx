@@ -7,6 +7,7 @@ import {
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getUnfinishedBooksAction } from "@/app/actions/reading-sessions";
 
 export default async function DashboardLayout({
   children,
@@ -29,6 +30,9 @@ export default async function DashboardLayout({
     avatar: session.user.image ?? undefined,
   };
 
+  // Fetch unfinished books for reading session dialog
+  const unfinishedBooks = await getUnfinishedBooksAction();
+
   return (
     <SidebarProvider
       style={
@@ -38,7 +42,7 @@ export default async function DashboardLayout({
         } as React.CSSProperties
       }
     >
-      <AppSidebar variant="inset" user={user} />
+      <AppSidebar variant="inset" user={user} unfinishedBooks={unfinishedBooks} />
       <SidebarInset>
         <SiteHeader />
         <div className="flex flex-1 flex-col">

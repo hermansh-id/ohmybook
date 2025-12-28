@@ -13,6 +13,7 @@ import {
   IconCalendar,
   IconNotebook,
   IconCategory,
+  IconBulb,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -56,6 +57,11 @@ const data = {
   ],
   activityNav: [
     {
+      title: "Recommendations",
+      url: "/dashboard/recommendations",
+      icon: IconBulb,
+    },
+    {
       title: "Calendar",
       url: "/dashboard/calendar",
       icon: IconCalendar,
@@ -96,9 +102,16 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
     email: string
     avatar?: string
   }
+  unfinishedBooks: Array<{
+    id: number
+    title: string
+    pages: number
+    currentPage: number
+    status: string
+  }>
 }
 
-export function AppSidebar({ user, ...props }: AppSidebarProps) {
+export function AppSidebar({ user, unfinishedBooks, ...props }: AppSidebarProps) {
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -117,7 +130,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.primaryNav} />
+        <NavMain items={data.primaryNav} unfinishedBooks={unfinishedBooks} />
         <SidebarSeparator />
         <SidebarGroup>
           <SidebarGroupLabel>Activity</SidebarGroupLabel>

@@ -1,14 +1,17 @@
 import { ReadingLogClient } from "./reading-log-client";
 import { getReadingSessions } from "@/lib/db/queries";
-import { getBooksAction } from "@/app/actions/books";
+import { getUnfinishedBooksAction } from "@/app/actions/reading-sessions";
 
 export default async function ReadingLogPage() {
-  const [sessionsResult, booksResult] = await Promise.all([
+  const [sessionsResult, unfinishedBooks] = await Promise.all([
     getReadingSessions(100),
-    getBooksAction(),
+    getUnfinishedBooksAction(),
   ]);
 
   return (
-    <ReadingLogClient initialSessions={sessionsResult} availableBooks={booksResult} />
+    <ReadingLogClient
+      initialSessions={sessionsResult}
+      unfinishedBooks={unfinishedBooks}
+    />
   );
 }

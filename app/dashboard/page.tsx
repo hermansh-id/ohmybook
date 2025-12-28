@@ -11,6 +11,7 @@ import {
   getReadingSessions,
   getReadingHistory,
 } from "@/lib/db/queries";
+import { getUnfinishedBooksAction } from "@/app/actions/reading-sessions";
 import {
   BookOpen,
   Target,
@@ -22,10 +23,11 @@ import {
   Award,
 } from "lucide-react";
 import Link from "next/link";
+import { AddReadingSessionDialog } from "@/components/add-reading-session-dialog";
 
 export default async function DashboardPage() {
   // Fetch dashboard data
-  const [stats, goal, monthlyStats, recentBooksData, currentlyReading, recentSessions, readingHistory] =
+  const [stats, goal, monthlyStats, recentBooksData, currentlyReading, recentSessions, readingHistory, unfinishedBooks] =
     await Promise.all([
       getReadingStats(),
       getCurrentYearGoal(),
@@ -34,6 +36,7 @@ export default async function DashboardPage() {
       getCurrentlyReadingBooks(),
       getReadingSessions(10),
       getReadingHistory(12),
+      getUnfinishedBooksAction(),
     ]);
 
   const readingStats = stats[0] || {
@@ -73,18 +76,15 @@ export default async function DashboardPage() {
           <p className="text-muted-foreground">Welcome back to your reading journey</p>
         </div>
         <div className="flex gap-2">
-          <Button asChild size="sm">
-            <Link href="/dashboard/books/add">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Book
-            </Link>
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link href="/dashboard/reading-log">
-              <FileText className="mr-2 h-4 w-4" />
-              Log Session
-            </Link>
-          </Button>
+          <AddReadingSessionDialog
+            books={unfinishedBooks}
+            trigger={
+              <Button size="sm" variant="outline">
+                <FileText className="mr-2 h-4 w-4" />
+                Log Session
+              </Button>
+            }
+          />
         </div>
       </div>
 

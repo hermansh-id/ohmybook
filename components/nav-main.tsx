@@ -1,6 +1,7 @@
 "use client"
 
-import { IconCirclePlusFilled, IconMail, type Icon } from "@tabler/icons-react"
+import { useState } from "react"
+import { IconCirclePlusFilled, IconClock, type Icon } from "@tabler/icons-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -10,15 +11,24 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { AddReadingSessionDialog } from "@/components/add-reading-session-dialog"
 
 export function NavMain({
   items,
+  unfinishedBooks,
 }: {
   items: {
     title: string
     url: string
     icon?: Icon
   }[]
+  unfinishedBooks: Array<{
+    id: number
+    title: string
+    pages: number
+    currentPage: number
+    status: string
+  }>
 }) {
   return (
     <SidebarGroup>
@@ -35,14 +45,19 @@ export function NavMain({
                 <span>Add Book</span>
               </a>
             </SidebarMenuButton>
-            <Button
-              size="icon"
-              className="size-8 group-data-[collapsible=icon]:opacity-0"
-              variant="outline"
-            >
-              <IconMail />
-              <span className="sr-only">Inbox</span>
-            </Button>
+            <AddReadingSessionDialog
+              books={unfinishedBooks}
+              trigger={
+                <Button
+                  size="icon"
+                  className="size-8 group-data-[collapsible=icon]:opacity-0"
+                  variant="outline"
+                >
+                  <IconClock />
+                  <span className="sr-only">Add Reading Session</span>
+                </Button>
+              }
+            />
           </SidebarMenuItem>
         </SidebarMenu>
         <SidebarMenu>
