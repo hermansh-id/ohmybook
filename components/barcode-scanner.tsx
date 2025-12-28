@@ -53,9 +53,19 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
         await scanner.start(
           cameraConfig,
           {
-            fps: 10,
-            qrbox: { width: 250, height: 150 },
+            fps: 30, // Increased FPS for better detection on mobile
+            qrbox: function(viewfinderWidth, viewfinderHeight) {
+              // Make qrbox responsive - larger on mobile for better detection
+              const minEdgePercentage = 0.7; // 70% of the smaller edge
+              const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+              const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+              return {
+                width: qrboxSize,
+                height: Math.floor(qrboxSize * 0.6) // Wider box for barcode (not square)
+              };
+            },
             aspectRatio: 1.777778, // 16:9 aspect ratio works better on mobile
+            disableFlip: false, // Allow horizontal flip for better detection
             // Scanner will automatically detect EAN-13, EAN-8, UPC-A, UPC-E and other barcode formats
           },
           (decodedText) => {
@@ -74,14 +84,22 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
           }
         );
       } catch (exactError) {
-        console.log("Exact facingMode failed, trying ideal:", exactError);
         // If exact fails (some devices don't support it), try with ideal
         await scanner.start(
           { facingMode: "environment" },
           {
-            fps: 10,
-            qrbox: { width: 250, height: 150 },
+            fps: 30,
+            qrbox: function(viewfinderWidth, viewfinderHeight) {
+              const minEdgePercentage = 0.7;
+              const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+              const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+              return {
+                width: qrboxSize,
+                height: Math.floor(qrboxSize * 0.6)
+              };
+            },
             aspectRatio: 1.777778,
+            disableFlip: false,
           },
           (decodedText) => {
             if (hasScannedRef.current) return;
@@ -99,8 +117,6 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
 
       setHasPermission(true);
     } catch (err: any) {
-      console.error("Scanner error:", err);
-
       if (err.name === "NotAllowedError" || err.toString().includes("Permission denied")) {
         setError("Camera permission denied. Please allow camera access to scan barcodes.");
         setHasPermission(false);
@@ -135,10 +151,6 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
         }
       } catch (err) {
         // Silently handle transition errors - these are expected when closing quickly
-        const errorMessage = err?.toString() || "";
-        if (!errorMessage.includes("transition")) {
-          console.error("Error stopping scanner:", err);
-        }
       } finally {
         scannerRef.current = null;
       }
@@ -188,15 +200,18 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
 
           {/* Instructions */}
           {isScanning && !error && (
-            <div className="mt-4 text-center space-y-2">
-              <p className="text-sm text-muted-foreground">
+            <div className="mt-4 text-center space-y-1">
+              <p className="text-sm font-medium text-muted-foreground">
                 Position the barcode within the frame
               </p>
               <p className="text-xs text-muted-foreground">
-                ISBN barcodes are usually on the back cover
+                📚 ISBN barcodes are usually on the back cover
               </p>
               <p className="text-xs text-muted-foreground">
-                📱 iPhone users: Make sure you're using Safari and allowed camera access
+                💡 Tips: Hold steady, ensure good lighting, keep barcode flat
+              </p>
+              <p className="text-xs text-muted-foreground">
+                📱 iPhone: Use Safari browser for best results
               </p>
             </div>
           )}
