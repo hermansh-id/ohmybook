@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getBookDetailsAction, updateBookStatusAction } from "@/app/actions/books";
+import { useRouter } from "next/navigation";
+import { getBookDetailsAction, updateBookStatusAction, deleteBookAction, fetchGoodreadsDataAction } from "@/app/actions/books";
 import {
   Dialog,
   DialogContent,
@@ -13,8 +14,20 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Calendar, Star, Clock, Tag, Check } from "lucide-react";
+import { BookOpen, Calendar, Star, Clock, Tag, Check, ExternalLink, Trash2, Download, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
+import { EditBookDialog } from "@/components/edit-book-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface BookDetailsDialogProps {
   bookId: number | null;
@@ -27,8 +40,11 @@ export function BookDetailsDialog({
   open,
   onOpenChange,
 }: BookDetailsDialogProps) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [selectedRating, setSelectedRating] = useState<number>(0);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
 
   const { data: book, isLoading } = useQuery({
     queryKey: ["book", bookId],
@@ -48,6 +64,36 @@ export function BookDetailsDialog({
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: deleteBookAction,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["books"] });
+      toast.success("Book deleted successfully!");
+      onOpenChange(false);
+      setShowDeleteDialog(false);
+    },
+    onError: () => {
+      toast.error("Failed to delete book");
+    },
+  });
+
+  const fetchGoodreadsMutation = useMutation({
+    mutationFn: ({ bookId, isbn }: { bookId: number; isbn: string }) =>
+      fetchGoodreadsDataAction(bookId, isbn),
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ["books"] });
+        queryClient.invalidateQueries({ queryKey: ["book", bookId] });
+        toast.success("Goodreads data fetched successfully!");
+      } else {
+        toast.error(result.error || "Failed to fetch Goodreads data");
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to fetch Goodreads data");
+    },
+  });
+
   const handleMarkAsFinished = () => {
     if (!book || !selectedRating) {
       toast.error("Please select a rating");
@@ -63,6 +109,19 @@ export function BookDetailsDialog({
     });
   };
 
+  const handleDelete = () => {
+    if (!book) return;
+    deleteMutation.mutate(book.id);
+  };
+
+  const handleFetchGoodreadsData = () => {
+    if (!book || !book.isbn) {
+      toast.error("ISBN is required to fetch Goodreads data");
+      return;
+    }
+    fetchGoodreadsMutation.mutate({ bookId: book.id, isbn: book.isbn });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -75,10 +134,39 @@ export function BookDetailsDialog({
         {book && (
           <>
             <DialogHeader>
-              <DialogTitle className="text-2xl">{book.title}</DialogTitle>
-              <DialogDescription>
-                {book.isbn && `ISBN: ${book.isbn}`}
-              </DialogDescription>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <DialogTitle className="text-2xl">{book.title}</DialogTitle>
+                  <DialogDescription>
+                    {book.isbn && `ISBN: ${book.isbn}`}
+                  </DialogDescription>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowEditDialog(true)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    <span className="ml-2 hidden sm:inline">Edit</span>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/dashboard/books/${book.id}`}>
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      <span className="hidden sm:inline">View Details</span>
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="ml-2 hidden sm:inline">Delete</span>
+                  </Button>
+                </div>
+              </div>
             </DialogHeader>
 
             <div className="grid gap-6 py-4">
@@ -211,6 +299,34 @@ export function BookDetailsDialog({
                 </>
               )}
 
+              {/* Fetch Goodreads Data - Show when ISBN exists but no Goodreads data */}
+              {book.isbn && !book.coverUrl && !book.description && (
+                <>
+                  <Separator />
+                  <div className="rounded-lg border border-dashed bg-muted/30 p-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div>
+                        <h3 className="font-semibold mb-1 flex items-center gap-2">
+                          <Download className="h-4 w-4" />
+                          Goodreads Data Missing
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Fetch book cover, description, and other details from Goodreads using ISBN
+                        </p>
+                      </div>
+                      <Button
+                        onClick={handleFetchGoodreadsData}
+                        disabled={fetchGoodreadsMutation.isPending}
+                        size="sm"
+                        className="w-full sm:w-auto shrink-0"
+                      >
+                        {fetchGoodreadsMutation.isPending ? "Fetching..." : "Fetch Data"}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {/* Review */}
               {book.review && (
                 <>
@@ -308,6 +424,45 @@ export function BookDetailsDialog({
           </>
         )}
       </DialogContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete "{book?.title}" and all associated data.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Book Dialog */}
+      {book && (
+        <EditBookDialog
+          book={{
+            id: book.id,
+            title: book.title,
+            isbn: book.isbn,
+            year: book.year,
+            pages: book.pages,
+            goodreadsUrl: book.goodreadsUrl,
+          }}
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+        />
+      )}
     </Dialog>
   );
 }

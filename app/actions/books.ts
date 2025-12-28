@@ -2,7 +2,8 @@
 
 import { getAllBooksWithDetails, getBookById } from "@/lib/db/queries";
 import { db } from "@/lib/db";
-import { books, authors, bookAuthors } from "@/lib/db/schema";
+import { books, authors, bookAuthors, goodreadsData, bookGenres } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import * as cheerio from "cheerio";
 
@@ -143,6 +144,9 @@ export interface AddBookInput {
   year?: number;
   pages?: number;
   authorIds: number[];
+  genreIds?: number[];
+  coverUrl?: string;
+  description?: string;
 }
 
 export async function addBookAction(input: AddBookInput) {
@@ -170,12 +174,86 @@ export async function addBookAction(input: AddBookInput) {
       );
     }
 
+    // Link genres to the book
+    if (input.genreIds && input.genreIds.length > 0) {
+      await db.insert(bookGenres).values(
+        input.genreIds.map((genreId, index) => ({
+          bookId: book.bookId,
+          genreId,
+          isPrimary: index === 0, // First genre is primary
+        }))
+      );
+    }
+
+    // Save Goodreads data if available
+    if (input.coverUrl || input.description) {
+      try {
+        await db.insert(goodreadsData).values({
+          bookId: book.bookId,
+          coverUrl: input.coverUrl || null,
+          description: input.description || null,
+        });
+      } catch (error) {
+        console.error("Error saving Goodreads data:", error);
+        // Don't fail the whole operation if Goodreads data fails
+      }
+    }
+
     revalidatePath("/books");
     revalidatePath("/dashboard");
     return { success: true, bookId: book.bookId };
   } catch (error) {
     console.error("Error adding book:", error);
     return { success: false, error: "Failed to add book" };
+  }
+}
+
+export async function deleteBookAction(bookId: number) {
+  try {
+    // Delete the book (cascade will handle related records)
+    await db.delete(books).where(eq(books.bookId, bookId));
+
+    revalidatePath("/dashboard/books");
+    revalidatePath("/dashboard");
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting book:", error);
+    return { success: false, error: "Failed to delete book" };
+  }
+}
+
+export interface UpdateBookInput {
+  bookId: number;
+  title?: string;
+  isbn?: string;
+  year?: number;
+  pages?: number;
+  goodreadsUrl?: string;
+}
+
+export async function updateBookAction(input: UpdateBookInput) {
+  try {
+    const { bookId, ...updateData } = input;
+
+    // Build update object with only provided fields
+    const dataToUpdate: any = {};
+    if (updateData.title !== undefined) dataToUpdate.title = updateData.title;
+    if (updateData.isbn !== undefined) dataToUpdate.isbn = updateData.isbn || null;
+    if (updateData.year !== undefined) dataToUpdate.year = updateData.year || null;
+    if (updateData.pages !== undefined) dataToUpdate.pages = updateData.pages || null;
+    if (updateData.goodreadsUrl !== undefined) dataToUpdate.goodreadsUrl = updateData.goodreadsUrl || null;
+
+    await db
+      .update(books)
+      .set(dataToUpdate)
+      .where(eq(books.bookId, bookId));
+
+    revalidatePath("/dashboard/books");
+    revalidatePath("/dashboard");
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating book:", error);
+    return { success: false, error: "Failed to update book" };
   }
 }
 
@@ -339,5 +417,76 @@ function parseBookPage(html: string, url: string): BookLookupResult {
   } catch (error) {
     console.error("Error parsing book page:", error);
     return { success: false, error: "Failed to parse book data" };
+  }
+}
+
+export async function fetchGoodreadsDataAction(bookId: number, isbn: string) {
+  try {
+    console.log("Fetching Goodreads data for book:", bookId, "ISBN:", isbn);
+
+    // Lookup book data from Goodreads using ISBN
+    const result = await lookupBookByISBN(isbn);
+
+    console.log("Lookup result:", result);
+
+    if (!result.success || !result.data) {
+      console.error("Lookup failed:", result.error);
+      return { success: false, error: result.error || "Failed to fetch Goodreads data" };
+    }
+
+    // Check if Goodreads data already exists for this book
+    const existingData = await db
+      .select()
+      .from(goodreadsData)
+      .where(eq(goodreadsData.bookId, bookId))
+      .limit(1);
+
+    console.log("Existing data:", existingData.length > 0 ? "Found" : "Not found");
+
+    const goodreadsDataToSave = {
+      coverUrl: result.data.coverUrl || null,
+      description: result.data.description || null,
+      lastUpdated: new Date(),
+    };
+
+    console.log("Data to save:", goodreadsDataToSave);
+
+    if (existingData.length > 0) {
+      // Update existing Goodreads data
+      const updated = await db
+        .update(goodreadsData)
+        .set(goodreadsDataToSave)
+        .where(eq(goodreadsData.bookId, bookId))
+        .returning();
+
+      console.log("Updated data:", updated);
+    } else {
+      // Insert new Goodreads data
+      const inserted = await db.insert(goodreadsData).values({
+        bookId,
+        ...goodreadsDataToSave,
+      }).returning();
+
+      console.log("Inserted data:", inserted);
+    }
+
+    // Update book's Goodreads URL if we have one
+    if (result.data.goodreadsUrl) {
+      await db
+        .update(books)
+        .set({ goodreadsUrl: result.data.goodreadsUrl })
+        .where(eq(books.bookId, bookId));
+
+      console.log("Updated book with Goodreads URL");
+    }
+
+    revalidatePath("/dashboard/books");
+    revalidatePath("/dashboard");
+
+    console.log("Successfully saved Goodreads data");
+    return { success: true };
+  } catch (error) {
+    console.error("Error fetching Goodreads data:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch Goodreads data" };
   }
 }

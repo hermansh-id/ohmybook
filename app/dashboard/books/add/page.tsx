@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Check, ChevronsUpDown, X, Plus, Search, Loader2 } from "lucide-react";
+import { Check, ChevronsUpDown, X, Plus, Search, Loader2, ScanBarcode } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -40,8 +40,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { BarcodeScanner } from "@/components/barcode-scanner";
 import { addBookAction, getAuthorsAction, lookupBookByISBN } from "@/app/actions/books";
 import { addAuthor } from "@/app/actions/authors";
+import { getGenresAction, addGenre } from "@/app/actions/genres";
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -58,18 +61,36 @@ interface Author {
   name: string;
 }
 
+interface Genre {
+  genreId: number;
+  genreName: string;
+}
+
 export default function AddBookPage() {
   const router = useRouter();
   const [authors, setAuthors] = useState<Author[]>([]);
   const [selectedAuthors, setSelectedAuthors] = useState<Author[]>([]);
+  const [genres, setGenres] = useState<Genre[]>([]);
+  const [selectedGenres, setSelectedGenres] = useState<Genre[]>([]);
   const [open, setOpen] = useState(false);
+  const [genreOpen, setGenreOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAddAuthorDialog, setShowAddAuthorDialog] = useState(false);
   const [newAuthorName, setNewAuthorName] = useState("");
   const [newAuthorBio, setNewAuthorBio] = useState("");
   const [isAddingAuthor, setIsAddingAuthor] = useState(false);
+  const [showAddGenreDialog, setShowAddGenreDialog] = useState(false);
+  const [newGenreName, setNewGenreName] = useState("");
+  const [newGenreDescription, setNewGenreDescription] = useState("");
+  const [isAddingGenre, setIsAddingGenre] = useState(false);
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
+  const [bookPreview, setBookPreview] = useState<{
+    coverUrl?: string;
+    description?: string;
+    goodreadsUrl?: string;
+  } | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -91,6 +112,15 @@ export default function AddBookPage() {
     loadAuthors();
   }, []);
 
+  // Load genres
+  useEffect(() => {
+    async function loadGenres() {
+      const data = await getGenresAction();
+      setGenres(data);
+    }
+    loadGenres();
+  }, []);
+
   async function onSubmit(values: FormValues) {
     if (selectedAuthors.length === 0) {
       alert("Please select at least one author");
@@ -106,6 +136,9 @@ export default function AddBookPage() {
         year: values.year ?? undefined,
         pages: values.pages ?? undefined,
         authorIds: selectedAuthors.map((a) => a.authorId),
+        genreIds: selectedGenres.map((g) => g.genreId),
+        coverUrl: bookPreview?.coverUrl,
+        description: bookPreview?.description,
       });
 
       if (result.success) {
@@ -172,6 +205,139 @@ export default function AddBookPage() {
     setSelectedAuthors((prev) => prev.filter((a) => a.authorId !== authorId));
   }
 
+  async function handleAddGenre() {
+    if (!newGenreName.trim()) {
+      alert("Genre name is required");
+      return;
+    }
+
+    setIsAddingGenre(true);
+    try {
+      const result = await addGenre({
+        genreName: newGenreName.trim(),
+        description: newGenreDescription.trim() || undefined,
+      });
+
+      if (result.success && result.genre) {
+        // Add to genres list
+        const newGenre = {
+          genreId: result.genre.genreId,
+          genreName: result.genre.genreName,
+        };
+        setGenres((prev) => [...prev, newGenre].sort((a, b) => a.genreName.localeCompare(b.genreName)));
+
+        // Auto-select the new genre
+        setSelectedGenres((prev) => [...prev, newGenre]);
+
+        // Reset and close dialog
+        setNewGenreName("");
+        setNewGenreDescription("");
+        setShowAddGenreDialog(false);
+      } else {
+        alert(result.error || "Failed to add genre");
+      }
+    } catch (error) {
+      alert("Failed to add genre");
+    } finally {
+      setIsAddingGenre(false);
+    }
+  }
+
+  function toggleGenre(genre: Genre) {
+    setSelectedGenres((prev) => {
+      const exists = prev.find((g) => g.genreId === genre.genreId);
+      if (exists) {
+        return prev.filter((g) => g.genreId !== genre.genreId);
+      }
+      return [...prev, genre];
+    });
+  }
+
+  function removeGenre(genreId: number) {
+    setSelectedGenres((prev) => prev.filter((g) => g.genreId !== genreId));
+  }
+
+  async function handleBarcodeScan(barcode: string) {
+    // Set the ISBN field value
+    form.setValue("isbn", barcode);
+
+    // Automatically trigger lookup
+    setIsLookingUp(true);
+    setLookupError(null);
+
+    try {
+      const result = await lookupBookByISBN(barcode.trim());
+
+      if (!result.success || !result.data) {
+        setLookupError(result.error || "Book not found");
+        return;
+      }
+
+      const { data } = result;
+
+      // Auto-fill form fields
+      form.setValue("title", data.title);
+      if (data.year) form.setValue("year", data.year);
+      if (data.pages) form.setValue("pages", data.pages);
+      if (data.goodreadsUrl) form.setValue("goodreadsUrl", data.goodreadsUrl);
+
+      // Handle authors
+      if (data.authors && data.authors.length > 0) {
+        const authorsToSelect: Author[] = [];
+        const processedNames = new Set<string>();
+
+        for (const authorName of data.authors) {
+          // Skip if we've already processed this author name (handle duplicates from API)
+          const normalizedName = authorName.toLowerCase().trim();
+          if (processedNames.has(normalizedName)) {
+            continue;
+          }
+          processedNames.add(normalizedName);
+
+          // Check if author already exists in database
+          let existingAuthor = authors.find(
+            (a) => a.name.toLowerCase() === normalizedName
+          );
+
+          // If not, create new author
+          if (!existingAuthor) {
+            const addResult = await addAuthor({ name: authorName.trim() });
+            if (addResult.success && addResult.author) {
+              const newAuthor = {
+                authorId: addResult.author.authorId,
+                name: addResult.author.name,
+              };
+              setAuthors((prev) => [...prev, newAuthor].sort((a, b) => a.name.localeCompare(b.name)));
+              existingAuthor = newAuthor;
+            }
+          }
+
+          if (existingAuthor) {
+            authorsToSelect.push(existingAuthor);
+          }
+        }
+
+        setSelectedAuthors(authorsToSelect);
+      }
+
+      // Save preview data
+      setBookPreview({
+        coverUrl: data.coverUrl,
+        description: data.description,
+        goodreadsUrl: data.goodreadsUrl,
+      });
+
+      // Show success
+      setLookupError(null);
+    } catch (error) {
+      console.error("Lookup error:", error);
+      setLookupError("An error occurred during lookup");
+      setBookPreview(null);
+    } finally {
+      setIsLookingUp(false);
+    }
+  }
+
   async function handleIsbnLookup() {
     const isbn = form.getValues("isbn");
     if (!isbn || !isbn.trim()) {
@@ -201,16 +367,24 @@ export default function AddBookPage() {
       // Handle authors
       if (data.authors && data.authors.length > 0) {
         const authorsToSelect: Author[] = [];
+        const processedNames = new Set<string>();
 
         for (const authorName of data.authors) {
+          // Skip if we've already processed this author name (handle duplicates from API)
+          const normalizedName = authorName.toLowerCase().trim();
+          if (processedNames.has(normalizedName)) {
+            continue;
+          }
+          processedNames.add(normalizedName);
+
           // Check if author already exists in database
           let existingAuthor = authors.find(
-            (a) => a.name.toLowerCase() === authorName.toLowerCase()
+            (a) => a.name.toLowerCase() === normalizedName
           );
 
           // If not, create new author
           if (!existingAuthor) {
-            const addResult = await addAuthor({ name: authorName });
+            const addResult = await addAuthor({ name: authorName.trim() });
             if (addResult.success && addResult.author) {
               const newAuthor = {
                 authorId: addResult.author.authorId,
@@ -229,11 +403,19 @@ export default function AddBookPage() {
         setSelectedAuthors(authorsToSelect);
       }
 
+      // Save preview data
+      setBookPreview({
+        coverUrl: data.coverUrl,
+        description: data.description,
+        goodreadsUrl: data.goodreadsUrl,
+      });
+
       // Show success
       setLookupError(null);
     } catch (error) {
       console.error("Lookup error:", error);
       setLookupError("An error occurred during lookup");
+      setBookPreview(null);
     } finally {
       setIsLookingUp(false);
     }
@@ -260,8 +442,19 @@ export default function AddBookPage() {
                 <FormLabel>ISBN</FormLabel>
                 <div className="flex gap-2">
                   <FormControl>
-                    <Input placeholder="Enter ISBN (10 or 13 digits)" {...field} />
+                    <Input placeholder="Enter ISBN or scan barcode" {...field} />
                   </FormControl>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowScanner(true)}
+                    disabled={isLookingUp}
+                    className="shrink-0"
+                    title="Scan barcode"
+                  >
+                    <ScanBarcode className="h-4 w-4" />
+                    <span className="ml-2 hidden sm:inline">Scan</span>
+                  </Button>
                   <Button
                     type="button"
                     variant="outline"
@@ -281,12 +474,59 @@ export default function AddBookPage() {
                   <p className="text-sm text-destructive mt-1">{lookupError}</p>
                 )}
                 <p className="text-sm text-muted-foreground">
-                  Enter ISBN and click Lookup to auto-fill book details
+                  Scan the barcode or enter ISBN manually, then click Lookup
                 </p>
                 <FormMessage />
               </FormItem>
             )}
           />
+
+          {/* Book Preview from Goodreads */}
+          {bookPreview && (
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="flex flex-col gap-4 p-4 sm:flex-row sm:gap-6">
+                  {/* Book Cover */}
+                  {bookPreview.coverUrl && (
+                    <div className="flex-shrink-0">
+                      <img
+                        src={bookPreview.coverUrl}
+                        alt="Book cover"
+                        className="h-48 w-auto rounded-md border object-cover shadow-sm sm:h-56"
+                      />
+                    </div>
+                  )}
+
+                  {/* Book Info */}
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                        Preview from Goodreads
+                      </h3>
+                      {bookPreview.goodreadsUrl && (
+                        <a
+                          href={bookPreview.goodreadsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline"
+                        >
+                          View on Goodreads →
+                        </a>
+                      )}
+                    </div>
+
+                    {bookPreview.description && (
+                      <div>
+                        <p className="text-sm text-muted-foreground line-clamp-6">
+                          {bookPreview.description}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <FormField
             control={form.control}
@@ -370,6 +610,80 @@ export default function AddBookPage() {
                 size="icon"
                 onClick={() => setShowAddAuthorDialog(true)}
                 title="Add new author"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <FormLabel>Genres</FormLabel>
+            {selectedGenres.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {selectedGenres.map((genre) => (
+                  <Badge key={genre.genreId} variant="secondary">
+                    {genre.genreName}
+                    <button
+                      type="button"
+                      onClick={() => removeGenre(genre.genreId)}
+                      className="ml-2 hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Popover open={genreOpen} onOpenChange={setGenreOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={genreOpen}
+                    className="flex-1 justify-between"
+                  >
+                    Select genres...
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search genres..." />
+                    <CommandList>
+                      <CommandEmpty>No genre found.</CommandEmpty>
+                      <CommandGroup>
+                        {genres.map((genre) => (
+                          <CommandItem
+                            key={genre.genreId}
+                            value={genre.genreName}
+                            onSelect={() => {
+                              toggleGenre(genre);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedGenres.find((g) => g.genreId === genre.genreId)
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                            {genre.genreName}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setShowAddGenreDialog(true)}
+                title="Add new genre"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -504,6 +818,64 @@ export default function AddBookPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={showAddGenreDialog} onOpenChange={setShowAddGenreDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Genre</DialogTitle>
+            <DialogDescription>
+              Create a new genre to categorize your books
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="genre-name" className="text-sm font-medium">
+                Name *
+              </label>
+              <Input
+                id="genre-name"
+                placeholder="Genre name"
+                value={newGenreName}
+                onChange={(e) => setNewGenreName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="genre-description" className="text-sm font-medium">
+                Description (optional)
+              </label>
+              <Input
+                id="genre-description"
+                placeholder="Brief description"
+                value={newGenreDescription}
+                onChange={(e) => setNewGenreDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowAddGenreDialog(false);
+                setNewGenreName("");
+                setNewGenreDescription("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleAddGenre} disabled={isAddingGenre}>
+              {isAddingGenre ? "Adding..." : "Add Genre"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Barcode Scanner */}
+      <BarcodeScanner
+        isOpen={showScanner}
+        onScan={handleBarcodeScan}
+        onClose={() => setShowScanner(false)}
+      />
       </div>
     </div>
   );
