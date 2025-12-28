@@ -22,6 +22,13 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  // Prepare user data for the sidebar
+  const user = {
+    name: session.user.name,
+    email: session.user.email,
+    avatar: session.user.image ?? undefined,
+  };
+
   return (
     <SidebarProvider
       style={
@@ -31,7 +38,7 @@ export default async function DashboardLayout({
         } as React.CSSProperties
       }
     >
-      <AppSidebar variant="inset" />
+      <AppSidebar variant="inset" user={user} />
       <SidebarInset>
         <SiteHeader />
         <div className="flex flex-1 flex-col">
