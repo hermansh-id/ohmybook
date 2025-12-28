@@ -22,14 +22,29 @@ A modern, feature-rich book tracking and reading management application built wi
 - **Reading Statistics Overview**: Get a comprehensive view of your reading habits
 - **Reading Goal Tracker**: Set and track annual reading goals with progress visualization
 - **Library Completion**: Track what percentage of your library you've read with estimated completion time
+- **Reading Streaks & Heatmap**: GitHub-style 365-day activity heatmap with streak tracking
+  - Visual calendar showing reading activity (sessions + finished books)
+  - Current streak and best streak counters
+  - Color-coded intensity based on pages read
+  - Hover tooltips with detailed stats
 - **Currently Reading**: View all books in progress with progress bars
 - **Recent Finished Books**: Quick access to your recently completed reads
 - **Reading History Chart**: Visualize your reading activity over the past 12 months
-- **Quick Stats Cards**: Books read, pages read, reading time, and more at a glance
+- **Quick Stats Cards**: Books read, pages read, reading time, streaks, and more at a glance
 
 ### 📅 Calendar View
 - **Reading Calendar**: Visualize books finished by date
 - **Monthly/Yearly Views**: Track your reading patterns over time
+
+### 💭 Quotes & Highlights
+- **Quote Collection**: Save memorable quotes and passages from your books
+- **Rich Metadata**: Track page numbers, chapters, and personal notes
+- **Tag System**: Organize quotes with custom tags
+- **Favorites**: Star your most impactful quotes
+- **Search & Filter**: Find quotes by text, book, author, or tags
+- **Quote Cards**: Beautiful card display with book/author information
+- **Full CRUD**: Add, edit, delete, and manage all your quotes
+- **Quote Statistics**: Track total quotes, favorites, and books with highlights
 
 ### 🎨 Monthly Recap
 - **Monthly Reading Summary**: Generate beautiful monthly reading recaps
@@ -229,6 +244,19 @@ This is a personal project, but suggestions and bug reports are welcome!
 
 ---
 
-**Version**: 1.0.0
+**Version**: 1.1.0
 
 Made with ❤️ for book lovers
+
+## 📋 Changelog
+
+### v1.1.0 (Latest)
+- ✨ Added Reading Streaks & Activity Heatmap (GitHub-style)
+- ✨ Added Quotes & Highlights system with full CRUD
+- 🔥 Streak tracking (current & best streaks)
+- 💭 Quote management with tags, favorites, and search
+- 🎨 Enhanced heatmap showing both sessions and finished books
+- 📊 Quote statistics on dedicated Quotes page
+
+### v1.0.0
+- 🎉 Initial release with core reading tracking features
