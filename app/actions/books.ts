@@ -515,6 +515,32 @@ export async function getReadingRecommendationsAction() {
   }
 }
 
+export async function lookupBookByGoodreadsUrl(url: string): Promise<BookLookupResult> {
+  try {
+    // Validate URL
+    if (!url.includes("goodreads.com/book/show/")) {
+      return { success: false, error: "Invalid Goodreads URL. Must be a book page URL." };
+    }
+
+    // Fetch the book page
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      },
+    });
+
+    if (!response.ok) {
+      return { success: false, error: "Failed to fetch from Goodreads" };
+    }
+
+    const html = await response.text();
+    return parseBookPage(html, url);
+  } catch (error) {
+    console.error("Error looking up book by URL:", error);
+    return { success: false, error: "An error occurred while looking up the book" };
+  }
+}
+
 export async function fetchGoodreadsDataAction(bookId: number, isbn: string) {
   try {
     console.log("Fetching Goodreads data for book:", bookId, "ISBN:", isbn);

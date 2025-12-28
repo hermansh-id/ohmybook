@@ -42,7 +42,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { BarcodeScanner } from "@/components/barcode-scanner";
-import { addBookAction, getAuthorsAction, lookupBookByISBN } from "@/app/actions/books";
+import { addBookAction, getAuthorsAction, lookupBookByISBN, lookupBookByGoodreadsUrl } from "@/app/actions/books";
 import { addAuthor } from "@/app/actions/authors";
 import { getGenresAction, addGenre } from "@/app/actions/genres";
 
@@ -85,6 +85,8 @@ export default function AddBookPage() {
   const [isAddingGenre, setIsAddingGenre] = useState(false);
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
+  const [isGoodreadsLookingUp, setIsGoodreadsLookingUp] = useState(false);
+  const [goodreadsLookupError, setGoodreadsLookupError] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [bookPreview, setBookPreview] = useState<{
     coverUrl?: string;
@@ -421,6 +423,88 @@ export default function AddBookPage() {
     }
   }
 
+  async function handleGoodreadsLookup() {
+    const goodreadsUrl = form.getValues("goodreadsUrl");
+    if (!goodreadsUrl || !goodreadsUrl.trim()) {
+      setGoodreadsLookupError("Please enter a Goodreads URL first");
+      return;
+    }
+
+    setIsGoodreadsLookingUp(true);
+    setGoodreadsLookupError(null);
+
+    try {
+      const result = await lookupBookByGoodreadsUrl(goodreadsUrl.trim());
+
+      if (!result.success || !result.data) {
+        setGoodreadsLookupError(result.error || "Failed to fetch book data");
+        return;
+      }
+
+      const { data } = result;
+
+      // Auto-fill form fields
+      form.setValue("title", data.title);
+      if (data.year) form.setValue("year", data.year);
+      if (data.pages) form.setValue("pages", data.pages);
+
+      // Handle authors
+      if (data.authors && data.authors.length > 0) {
+        const authorsToSelect: Author[] = [];
+        const processedNames = new Set<string>();
+
+        for (const authorName of data.authors) {
+          // Skip if we've already processed this author name (handle duplicates from API)
+          const normalizedName = authorName.toLowerCase().trim();
+          if (processedNames.has(normalizedName)) {
+            continue;
+          }
+          processedNames.add(normalizedName);
+
+          // Check if author already exists in database
+          let existingAuthor = authors.find(
+            (a) => a.name.toLowerCase() === normalizedName
+          );
+
+          // If not, create new author
+          if (!existingAuthor) {
+            const addResult = await addAuthor({ name: authorName.trim() });
+            if (addResult.success && addResult.author) {
+              const newAuthor = {
+                authorId: addResult.author.authorId,
+                name: addResult.author.name,
+              };
+              setAuthors((prev) => [...prev, newAuthor].sort((a, b) => a.name.localeCompare(b.name)));
+              existingAuthor = newAuthor;
+            }
+          }
+
+          if (existingAuthor) {
+            authorsToSelect.push(existingAuthor);
+          }
+        }
+
+        setSelectedAuthors(authorsToSelect);
+      }
+
+      // Save preview data
+      setBookPreview({
+        coverUrl: data.coverUrl,
+        description: data.description,
+        goodreadsUrl: data.goodreadsUrl,
+      });
+
+      // Show success
+      setGoodreadsLookupError(null);
+    } catch (error) {
+      console.error("Goodreads lookup error:", error);
+      setGoodreadsLookupError("An error occurred during lookup");
+      setBookPreview(null);
+    } finally {
+      setIsGoodreadsLookingUp(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4 p-4 md:gap-6 md:p-6">
       <div>
@@ -696,9 +780,31 @@ export default function AddBookPage() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Goodreads URL</FormLabel>
-                <FormControl>
-                  <Input placeholder="https://www.goodreads.com/book/show/..." {...field} />
-                </FormControl>
+                <div className="flex gap-2">
+                  <FormControl>
+                    <Input placeholder="https://www.goodreads.com/book/show/..." {...field} />
+                  </FormControl>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleGoodreadsLookup}
+                    disabled={isGoodreadsLookingUp}
+                    className="shrink-0"
+                  >
+                    {isGoodreadsLookingUp ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                    <span className="ml-2 hidden sm:inline">Lookup</span>
+                  </Button>
+                </div>
+                {goodreadsLookupError && (
+                  <p className="text-sm text-destructive mt-1">{goodreadsLookupError}</p>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  For books without ISBN, paste Goodreads URL and click Lookup
+                </p>
                 <FormMessage />
               </FormItem>
             )}
