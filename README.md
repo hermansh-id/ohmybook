@@ -228,11 +228,11 @@ bookjet/
 
 ## 📝 License
 
-This project is private and for personal use.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🤝 Contributing
 
-This is a personal project, but suggestions and bug reports are welcome!
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to submit pull requests, report issues, and suggest improvements.
 
 ## 🙏 Acknowledgments
 

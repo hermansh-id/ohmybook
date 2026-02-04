@@ -1,7 +1,12 @@
 {
   "name": "bookjet",
   "version": "1.1.0",
-  "private": true,
+  "version": "1.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hermansh-id/ohmybook.git"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
