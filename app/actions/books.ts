@@ -315,52 +315,79 @@ export async function lookupBookByISBN(isbn: string): Promise<BookLookupResult> 
       return { success: false, error: "Invalid ISBN format" };
     }
 
-    // Search Goodreads
-    const searchUrl = `https://www.goodreads.com/search?utf8=%E2%9C%93&q=${cleanIsbn}&search_type=books&search%5Bfield%5D=on`;
+    const browserHeaders = {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "none",
+      "Upgrade-Insecure-Requests": "1",
+    };
 
-    const response = await fetch(searchUrl, {
+    // Use /book/isbn/ endpoint — avoids the AWS WAF-protected search page
+    const isbnUrl = `https://www.goodreads.com/book/isbn/${cleanIsbn}`;
+    console.log("[ISBN Lookup] Trying direct ISBN URL:", isbnUrl);
+
+    const response = await fetch(isbnUrl, {
       redirect: "follow",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-      },
+      headers: browserHeaders,
     });
 
-    if (!response.ok) {
+    console.log("[ISBN Lookup] Response status:", response.status);
+    console.log("[ISBN Lookup] Final URL after redirect:", response.url);
+
+    if (response.ok && response.url.includes("/book/show/")) {
+      const html = await response.text();
+      console.log("[ISBN Lookup] Got book page directly, HTML length:", html.length);
+      return parseBookPage(html, response.url);
+    }
+
+    // Fallback to search if direct ISBN URL didn't work
+    const searchUrl = `https://www.goodreads.com/search?utf8=%E2%9C%93&q=${cleanIsbn}&search_type=books&search%5Bfield%5D=on`;
+    console.log("[ISBN Lookup] Falling back to search URL:", searchUrl);
+
+    const searchResponse = await fetch(searchUrl, {
+      redirect: "follow",
+      headers: browserHeaders,
+    });
+
+    console.log("[ISBN Lookup] Search response status:", searchResponse.status);
+    console.log("[ISBN Lookup] Search final URL:", searchResponse.url);
+
+    if (!searchResponse.ok) {
       return { success: false, error: "Failed to fetch from Goodreads" };
     }
 
-    const html = await response.text();
-    const $ = cheerio.load(html);
+    const html = await searchResponse.text();
+    const currentUrl = searchResponse.url;
 
-    // Check if we got redirected to a book page or still on search results
-    const currentUrl = response.url;
-    const isBookPage = currentUrl.includes("/book/show/");
-
-    if (!isBookPage) {
-      // We're still on search results, try to get the first result
-      const firstBookLink = $('a.bookTitle').first().attr('href');
-      if (!firstBookLink) {
-        return { success: false, error: "Book not found on Goodreads" };
-      }
-
-      // Fetch the actual book page
-      const bookUrl = `https://www.goodreads.com${firstBookLink}`;
-      const bookResponse = await fetch(bookUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        },
-      });
-
-      if (!bookResponse.ok) {
-        return { success: false, error: "Failed to fetch book page" };
-      }
-
-      const bookHtml = await bookResponse.text();
-      return parseBookPage(bookHtml, bookUrl);
+    if (currentUrl.includes("/book/show/")) {
+      return parseBookPage(html, currentUrl);
     }
 
-    // We're already on the book page
-    return parseBookPage(html, currentUrl);
+    const $ = cheerio.load(html);
+    const firstBookLink =
+      $('a.bookTitle').first().attr('href') ||
+      $('a[href*="/book/show/"]').first().attr('href');
+
+    console.log("[ISBN Lookup] First book link from search:", firstBookLink);
+
+    if (!firstBookLink) {
+      return { success: false, error: "Book not found on Goodreads" };
+    }
+
+    const bookUrl = firstBookLink.startsWith("http")
+      ? firstBookLink
+      : `https://www.goodreads.com${firstBookLink}`;
+
+    const bookResponse = await fetch(bookUrl, { headers: browserHeaders });
+    if (!bookResponse.ok) {
+      return { success: false, error: "Failed to fetch book page" };
+    }
+
+    return parseBookPage(await bookResponse.text(), bookUrl);
   } catch (error) {
     console.error("Error looking up book:", error);
     return { success: false, error: "An error occurred while looking up the book" };
