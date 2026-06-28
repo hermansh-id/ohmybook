@@ -26,7 +26,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { signOut } from "@/lib/auth-client"
-import { useRouter } from "next/navigation"
+import { useNavigate } from "@tanstack/react-router"
 
 export function NavUser({
   user,
@@ -38,11 +38,11 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
-  const router = useRouter()
+  const navigate = useNavigate()
 
   async function handleLogout() {
     await signOut()
-    router.push("/login")
+    navigate({ to: '/login' })
   }
 
   // Generate initials from name

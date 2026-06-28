@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { MonthlyRecapData } from "@/app/actions/reading-recap";
+import { MonthlyRecapData } from "@/actions/reading-recap";
 import { X, ChevronLeft, ChevronRight, BookOpen, Star, Zap, Trophy, Calendar, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ShareableRecapCard } from "@/components/shareable-recap-card";

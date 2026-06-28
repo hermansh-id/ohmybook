@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Star, MoreVertical, Pencil, Trash2, Share2, BookOpen } from "lucide-react";
 import { useState } from "react";
-import { toggleQuoteFavoriteAction, deleteQuoteAction } from "@/app/actions/quotes";
+import { toggleQuoteFavoriteAction, deleteQuoteAction } from "@/actions/quotes";
 import { toast } from "sonner";
 import { EditQuoteDialog } from "./edit-quote-dialog";
 

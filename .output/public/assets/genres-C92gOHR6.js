@@ -1,0 +1,1 @@
+import{n as e,t}from"./createServerFn-BwA-uHPj.js";var n=t({method:`GET`}).handler(e(`600b96fe6bc263f507bb4e51b8c075cf8f2e48a9187c9a11c7b53763f7f15193`)),r=t({method:`POST`}).handler(e(`b6aec75738ca1669be65b3d0f67ffe736a5c36811a9dc9faab788289ac9d6b61`)),i=t({method:`GET`}).handler(e(`d122679c877b5eff4dc661a1f67cbb4741a21118c8425755ead1d88e971adab3`));export{n,i as r,r as t};

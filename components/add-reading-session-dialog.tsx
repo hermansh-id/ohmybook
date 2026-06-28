@@ -10,7 +10,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { AddReadingSessionForm } from "@/components/add-reading-session-form";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface AddReadingSessionDialogProps {
   books: Array<{
@@ -27,7 +27,7 @@ export function AddReadingSessionDialog({
   books,
   trigger,
 }: AddReadingSessionDialogProps) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
 
   return (
@@ -45,7 +45,9 @@ export function AddReadingSessionDialog({
           books={books}
           onSuccess={() => {
             setOpen(false);
-            router.refresh();
+            queryClient.invalidateQueries({ queryKey: ["reading-sessions"] });
+            queryClient.invalidateQueries({ queryKey: ["unfinished-books"] });
+            queryClient.invalidateQueries({ queryKey: ["dashboard"] });
           }}
         />
       </DialogContent>

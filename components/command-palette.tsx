@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "@tanstack/react-router";
 import { Command } from "cmdk";
-import { searchBooksAction } from "@/app/actions/search";
+import { searchBooksAction } from "@/actions/search";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +34,7 @@ interface SearchResult {
 }
 
 export function CommandPalette() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -160,7 +160,7 @@ export function CommandPalette() {
                   <Command.Item
                     key={page.url}
                     value={page.name}
-                    onSelect={() => handleSelect(() => router.push(page.url))}
+                    onSelect={() => handleSelect(() => navigate({ to: page.url }))}
                     className="flex items-center gap-2 rounded-sm px-2 py-2 text-sm cursor-pointer hover:bg-accent"
                   >
                     <page.icon className="h-4 w-4" />
@@ -179,7 +179,7 @@ export function CommandPalette() {
                     value={`${book.title} ${book.authorName}`}
                     onSelect={() =>
                       handleSelect(() =>
-                        router.push(`/dashboard/books/${book.bookId}`)
+                        navigate({ to: `/dashboard/books/${book.bookId}` })
                       )
                     }
                     className="flex items-start gap-2 rounded-sm px-2 py-2 cursor-pointer hover:bg-accent"

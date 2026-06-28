@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { updateBookAction } from "@/app/actions/books";
+import { updateBookAction } from "@/actions/books";
 import {
   Dialog,
   DialogContent,

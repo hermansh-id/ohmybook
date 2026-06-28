@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
-import { getBookDetailsAction, updateBookStatusAction, deleteBookAction, fetchGoodreadsDataAction } from "@/app/actions/books";
+import { getBookDetailsAction, updateBookStatusAction, deleteBookAction, fetchGoodreadsDataAction } from "@/actions/books";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { BookOpen, Calendar, Star, Clock, Tag, Check, ExternalLink, Trash2, Download, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import Link from "next/link";
+import { Link } from "@tanstack/react-router";
 import { EditBookDialog } from "@/components/edit-book-dialog";
 import {
   AlertDialog,
@@ -40,7 +39,6 @@ export function BookDetailsDialog({
   open,
   onOpenChange,
 }: BookDetailsDialogProps) {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const [selectedRating, setSelectedRating] = useState<number>(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -156,7 +154,7 @@ export function BookDetailsDialog({
                     <span className="ml-2 hidden sm:inline">Edit</span>
                   </Button>
                   <Button asChild variant="outline" size="sm">
-                    <Link href={`/dashboard/books/${book.id}`}>
+                    <Link to={`/dashboard/books/${book.id}`}>
                       <ExternalLink className="h-4 w-4 mr-2" />
                       <span className="hidden sm:inline">View Details</span>
                     </Link>

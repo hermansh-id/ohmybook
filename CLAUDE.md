@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Bookjet is a Next.js 16.1 application built with React 19, TypeScript, and Tailwind CSS v4. The project uses the App Router architecture with server components and follows the "new-york" shadcn/ui component style.
+Bookjet is a **TanStack Start** application built with React 19, TypeScript, and Tailwind CSS v4. It uses Vite + TanStack Router for file-based routing, TanStack Query for data fetching, and TanStack Table for tables. UI components follow the "new-york" shadcn/ui style.
 
 ## Package Manager
 
@@ -19,24 +19,31 @@ This project uses **Bun** as the package manager (indicated by `bun.lock`). Alwa
 
 ### Running the App
 ```bash
-bun dev          # Start development server at http://localhost:3000
+bun dev          # Start development server at http://localhost:3000 (Vite)
 bun build        # Build for production
-bun start        # Start production server
+bun start        # Start production server (node .output/server/index.mjs)
 ```
 
 ### Linting
 ```bash
-bun lint         # Run ESLint with Next.js config
+bun lint         # Run ESLint
 ```
 
 Note: There are no test scripts currently configured in this project.
 
 ## Architecture & Structure
 
-### Next.js App Router
-- Uses Next.js 16.1 with React 19.2 and App Router (`app/` directory)
+### TanStack Start (Vite)
+- Uses TanStack Start + TanStack Router with file-based routing in `app/` directory
+- Build tool: Vite (not webpack/Next.js)
+- Routes defined with `createFileRoute`, layouts with `createRootRoute`
+- Server functions via `createServerFn` from `@tanstack/react-start`
+- `app/__root.tsx` is the root layout; `app/dashboard.tsx` is the dashboard layout
+- Route data loaded via `loader` in route definitions, accessed via `Route.useLoaderData()`
+- Auth check in `app/dashboard.tsx` `beforeLoad` using `getRequest()` from `@tanstack/react-start/server`
+- Server actions are in `actions/` (root level, NOT inside `app/`)
+- API routes use `server: { handlers: { GET, POST } }` in createFileRoute
 - TypeScript strict mode enabled
-- Server components by default (RSC enabled in components.json)
 
 ### Styling System
 - **Tailwind CSS v4** with PostCSS (@tailwindcss/postcss)

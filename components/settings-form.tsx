@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { updateReadingGoalAction } from "@/app/actions/settings";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { updateReadingGoalAction } from "@/actions/settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ interface SettingsFormProps {
 }
 
 export function SettingsForm({ currentGoal }: SettingsFormProps) {
+  const queryClient = useQueryClient();
   const [targetBooks, setTargetBooks] = useState(currentGoal.targetBooks);
   const [targetPages, setTargetPages] = useState(currentGoal.targetPages);
 
@@ -26,6 +27,9 @@ export function SettingsForm({ currentGoal }: SettingsFormProps) {
     onSuccess: (result) => {
       if (result.success) {
         toast.success("Reading goal updated successfully!");
+        queryClient.invalidateQueries({ queryKey: ["settings"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+        queryClient.invalidateQueries({ queryKey: ["statistics"] });
       } else {
         toast.error(result.error || "Failed to update goal");
       }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { exportReadingLogToCsvAction } from "@/app/actions/settings";
+import { exportReadingLogToCsvAction } from "@/actions/settings";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 

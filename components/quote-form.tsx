@@ -13,11 +13,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { createQuoteAction, updateQuoteAction } from "@/app/actions/quotes";
+import { createQuoteAction, updateQuoteAction } from "@/actions/quotes";
 import { toast } from "sonner";
 import { Loader2, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { getAllBooksAction } from "@/app/actions/books";
+import { getAllBooksAction } from "@/actions/books";
 
 interface QuoteFormProps {
   quote?: {

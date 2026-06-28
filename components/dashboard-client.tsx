@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, Share2, Download } from "lucide-react";
 import { MonthlyRecap } from "@/components/monthly-recap";
 import { ShareableRecapCard } from "@/components/shareable-recap-card";
-import { getMonthlyRecapAction, MonthlyRecapData } from "@/app/actions/reading-recap";
+import { getMonthlyRecapAction, MonthlyRecapData } from "@/actions/reading-recap";
 import { toast } from "sonner";
 import { toPng } from "html-to-image";
 

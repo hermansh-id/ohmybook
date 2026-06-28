@@ -1,11 +1,11 @@
-"use client";
-
 import { useState, useMemo } from "react";
+import { useCalendar } from "@/lib/queries/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { BookOpen, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import { Link } from "@tanstack/react-router";
 
 interface FinishedBook {
   log: {
@@ -24,27 +24,22 @@ interface FinishedBook {
   } | null;
 }
 
-interface CalendarClientProps {
-  initialBooks: FinishedBook[];
-  initialYear: number;
-  initialMonth: number;
-}
-
-export function CalendarClient({
-  initialBooks,
-  initialYear,
-  initialMonth,
-}: CalendarClientProps) {
-  const [currentDate, setCurrentDate] = useState(
-    new Date(initialYear, initialMonth - 1)
-  );
+export function CalendarClient() {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+
+  const { data, isLoading } = useCalendar(year, month);
+  const books: FinishedBook[] = data?.books ?? [];
+
+  const currentDate = new Date(year, month - 1);
 
   // Group books by date
   const booksByDate = useMemo(() => {
     const grouped = new Map<string, FinishedBook[]>();
 
-    initialBooks.forEach((book) => {
+    books.forEach((book) => {
       if (book.log.dateFinished) {
         const date = new Date(book.log.dateFinished);
         const dateKey = date.toISOString().split("T")[0];
@@ -57,7 +52,7 @@ export function CalendarClient({
     });
 
     return grouped;
-  }, [initialBooks]);
+  }, [books]);
 
   // Get books for selected date
   const selectedBooks = useMemo(() => {
@@ -68,14 +63,11 @@ export function CalendarClient({
 
   // Generate days for current month
   const daysInMonth = useMemo(() => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
+    const lastDay = new Date(year, month, 0);
     const days = [];
 
     for (let d = 1; d <= lastDay.getDate(); d++) {
-      const date = new Date(year, month, d);
+      const date = new Date(year, month - 1, d);
       const dateKey = date.toISOString().split("T")[0];
       const booksCount = booksByDate.get(dateKey)?.length || 0;
 
@@ -84,22 +76,46 @@ export function CalendarClient({
         day: d,
         dateKey,
         booksCount,
-        isToday:
-          date.toDateString() === new Date().toDateString(),
-        isSelected:
-          selectedDate?.toDateString() === date.toDateString(),
+        isToday: date.toDateString() === new Date().toDateString(),
+        isSelected: selectedDate?.toDateString() === date.toDateString(),
       });
     }
 
     return days;
-  }, [currentDate, booksByDate, selectedDate]);
+  }, [year, month, booksByDate, selectedDate]);
 
   const handleMonthChange = (increment: number) => {
-    const newDate = new Date(currentDate);
-    newDate.setMonth(newDate.getMonth() + increment);
-    setCurrentDate(newDate);
-    window.location.href = `/dashboard/calendar?year=${newDate.getFullYear()}&month=${newDate.getMonth() + 1}`;
+    const newDate = new Date(year, month - 1 + increment);
+    setYear(newDate.getFullYear());
+    setMonth(newDate.getMonth() + 1);
+    setSelectedDate(undefined);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-4 p-4 md:gap-6 md:p-6">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-64" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="pt-6">
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 p-4 md:gap-6 md:p-6">
@@ -110,13 +126,13 @@ export function CalendarClient({
         </p>
       </div>
 
-      {/* Stats summary - MOVED TO TOP */}
+      {/* Stats summary */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Books Finished</p>
-              <p className="text-2xl font-bold">{initialBooks.length}</p>
+              <p className="text-2xl font-bold">{books.length}</p>
             </div>
           </CardContent>
         </Card>
@@ -125,10 +141,7 @@ export function CalendarClient({
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Total Pages</p>
               <p className="text-2xl font-bold">
-                {initialBooks.reduce(
-                  (sum, book) => sum + (book.book.pages || 0),
-                  0
-                )}
+                {books.reduce((sum, book) => sum + (book.book.pages || 0), 0)}
               </p>
             </div>
           </CardContent>
@@ -138,12 +151,10 @@ export function CalendarClient({
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Average Rating</p>
               <p className="text-2xl font-bold">
-                {initialBooks.filter((b) => b.log.rating).length > 0
+                {books.filter((b) => b.log.rating).length > 0
                   ? (
-                      initialBooks.reduce(
-                        (sum, book) => sum + (book.log.rating || 0),
-                        0
-                      ) / initialBooks.filter((b) => b.log.rating).length
+                      books.reduce((sum, book) => sum + (book.log.rating || 0), 0) /
+                      books.filter((b) => b.log.rating).length
                     ).toFixed(1)
                   : "N/A"}
               </p>
@@ -160,7 +171,7 @@ export function CalendarClient({
         </Card>
       </div>
 
-      {/* Calendar - Full Width Horizontal */}
+      {/* Calendar */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -200,10 +211,10 @@ export function CalendarClient({
             <div>Sat</div>
           </div>
 
-          {/* Calendar Grid - Simplified */}
+          {/* Calendar Grid */}
           <div className="grid grid-cols-7 gap-1.5">
             {/* Empty cells for days before month starts */}
-            {Array.from({ length: new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay() }).map((_, i) => (
+            {Array.from({ length: new Date(year, month - 1, 1).getDay() }).map((_, i) => (
               <div key={`empty-${i}`} className="h-12" />
             ))}
 
@@ -256,7 +267,7 @@ export function CalendarClient({
         </CardContent>
       </Card>
 
-      {/* Books list for selected date - BELOW CALENDAR */}
+      {/* Books list for selected date */}
       {selectedDate && (
         <Card>
           <CardHeader>
@@ -282,7 +293,7 @@ export function CalendarClient({
                 {selectedBooks.map((book) => (
                   <Link
                     key={book.log.logId}
-                    href={`/dashboard/books/${book.book.bookId}`}
+                    to={`/dashboard/books/${book.book.bookId}`}
                     className="flex flex-col gap-3 rounded-lg border p-4 transition-all hover:bg-accent hover:shadow-md group"
                   >
                     <div className="flex gap-3">

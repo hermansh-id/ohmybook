@@ -1,6 +1,6 @@
 "use client";
 
-import { MonthlyRecapData } from "@/app/actions/reading-recap";
+import { MonthlyRecapData } from "@/actions/reading-recap";
 import { forwardRef } from "react";
 
 interface ShareableRecapCardProps {

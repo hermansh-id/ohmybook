@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createReadingSessionAction, getUnfinishedBooksAction } from "@/app/actions/reading-sessions";
+import { createReadingSessionAction, getUnfinishedBooksAction } from "@/actions/reading-sessions";
 import {
   Select,
   SelectContent,

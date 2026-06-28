@@ -6,7 +6,7 @@ import { BooksTable, Book } from "@/components/books-table";
 import { BookDetailsDialog } from "@/components/book-details-dialog";
 import { BookOpen, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import { Link } from "@tanstack/react-router";
 
 export function BooksClient() {
   const { data: books, isLoading, error } = useBooks();
@@ -28,7 +28,7 @@ export function BooksClient() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/dashboard/books/add">
+          <Link to="/dashboard/books/add">
             <Plus className="h-4 w-4 mr-2" />
             Add Book
           </Link>

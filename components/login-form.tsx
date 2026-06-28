@@ -18,7 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { signIn, signUp } from "@/lib/auth-client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 export function LoginForm({
@@ -29,47 +29,45 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const navigate = useNavigate();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    try {
-      if (isSignUp) {
-        const result = await signUp.email({
-          email,
-          password,
-          name: email.split("@")[0], // Use email prefix as username
-        });
-
-        if (result.error) {
-          toast.error(result.error.message || "Failed to create account");
-          return;
-        }
-
-        toast.success("Account created successfully! Please sign in.");
-        setIsSignUp(false);
-        setPassword(""); // Clear password for sign in
-      } else {
-        const result = await signIn.email({
-          email,
-          password,
-        });
-
-        if (result.error) {
-          toast.error(result.error.message || "Invalid email or password");
-          return;
-        }
-
-        toast.success("Signed in successfully!");
-        router.push("/dashboard");
-        router.refresh();
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Authentication failed");
-    } finally {
-      setIsLoading(false);
+    if (isSignUp) {
+      await signUp.email(
+        { email, password, name: email.split("@")[0] },
+        {
+          onSuccess: () => {
+            toast.success("Account created! Please sign in.");
+            setIsSignUp(false);
+            setPassword("");
+            setIsLoading(false);
+          },
+          onError: (ctx) => {
+            toast.error(ctx.error.message || "Failed to create account");
+            setIsLoading(false);
+          },
+        },
+      );
+    } else {
+      await signIn.email(
+        { email, password },
+        {
+          onSuccess: async () => {
+            toast.success("Signed in successfully!");
+            await router.invalidate();
+            navigate({ to: "/dashboard" });
+            setIsLoading(false);
+          },
+          onError: (ctx) => {
+            toast.error(ctx.error.message || "Invalid email or password");
+            setIsLoading(false);
+          },
+        },
+      );
     }
   };
 
