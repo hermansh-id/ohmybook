@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/db";
 import { authors } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export interface AddAuthorInput {
@@ -11,11 +12,16 @@ export interface AddAuthorInput {
 
 export async function addAuthor(input: AddAuthorInput) {
   try {
+    // Upsert: return existing author if name already taken
     const [author] = await db
       .insert(authors)
       .values({
         name: input.name,
         bio: input.bio || null,
+      })
+      .onConflictDoUpdate({
+        target: authors.name,
+        set: { name: authors.name }, // no-op update so we can use .returning()
       })
       .returning();
 
