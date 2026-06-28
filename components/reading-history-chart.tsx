@@ -44,11 +44,11 @@ interface ReadingHistoryChartProps {
 const chartConfig = {
   booksRead: {
     label: "Books Read",
-    color: "hsl(var(--primary))",
+    color: "var(--chart-1)",
   },
   pagesRead: {
     label: "Pages Read",
-    color: "hsl(var(--chart-2))",
+    color: "var(--chart-2)",
   },
 } satisfies ChartConfig
 
@@ -229,24 +229,24 @@ export function ReadingHistoryChart({
                 <linearGradient id="fillBooks" x1="0" y1="0" x2="0" y2="1">
                   <stop
                     offset="5%"
-                    stopColor="hsl(var(--primary))"
+                    stopColor="var(--chart-1)"
                     stopOpacity={0.8}
                   />
                   <stop
                     offset="95%"
-                    stopColor="hsl(var(--primary))"
+                    stopColor="var(--chart-1)"
                     stopOpacity={0.1}
                   />
                 </linearGradient>
                 <linearGradient id="fillPages" x1="0" y1="0" x2="0" y2="1">
                   <stop
                     offset="5%"
-                    stopColor="hsl(var(--chart-2))"
+                    stopColor="var(--chart-2)"
                     stopOpacity={0.8}
                   />
                   <stop
                     offset="95%"
-                    stopColor="hsl(var(--chart-2))"
+                    stopColor="var(--chart-2)"
                     stopOpacity={0.1}
                   />
                 </linearGradient>
@@ -285,7 +285,7 @@ export function ReadingHistoryChart({
                   dataKey="booksRead"
                   type="monotone"
                   fill="url(#fillBooks)"
-                  stroke="hsl(var(--primary))"
+                  stroke="var(--chart-1)"
                   strokeWidth={2}
                 />
               ) : (
@@ -293,7 +293,7 @@ export function ReadingHistoryChart({
                   dataKey="pagesRead"
                   type="monotone"
                   fill="url(#fillPages)"
-                  stroke="hsl(var(--chart-2))"
+                  stroke="var(--chart-2)"
                   strokeWidth={2}
                 />
               )}
