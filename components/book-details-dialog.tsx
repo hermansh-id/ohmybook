@@ -46,7 +46,7 @@ export function BookDetailsDialog({
 
   const { data: book, isLoading } = useQuery({
     queryKey: ["book", bookId],
-    queryFn: () => getBookDetailsAction(bookId!),
+    queryFn: () => getBookDetailsAction({ data: { bookId: bookId! } }),
     enabled: !!bookId && open,
   });
 
