@@ -51,7 +51,8 @@ export function BookDetailsDialog({
   });
 
   const updateMutation = useMutation({
-    mutationFn: updateBookStatusAction,
+    mutationFn: (args: { bookId: number; logId?: number | null; status: string; rating?: number | null; dateFinished?: Date | null }) =>
+      updateBookStatusAction({ data: args }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["books"] });
       queryClient.invalidateQueries({ queryKey: ["book", bookId] });
@@ -63,7 +64,7 @@ export function BookDetailsDialog({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: deleteBookAction,
+    mutationFn: (id: number) => deleteBookAction({ data: { bookId: id } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["books"] });
       toast.success("Book deleted successfully!");
@@ -77,7 +78,7 @@ export function BookDetailsDialog({
 
   const fetchGoodreadsMutation = useMutation({
     mutationFn: ({ bookId, isbn }: { bookId: number; isbn: string }) =>
-      fetchGoodreadsDataAction(bookId, isbn),
+      fetchGoodreadsDataAction({ data: { bookId, isbn } }),
     onSuccess: (result) => {
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: ["books"] });
@@ -137,38 +138,34 @@ export function BookDetailsDialog({
         {book && (
           <>
             <DialogHeader>
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1">
-                  <DialogTitle className="text-2xl">{book.title}</DialogTitle>
-                  <DialogDescription>
-                    {book.isbn && `ISBN: ${book.isbn}`}
-                  </DialogDescription>
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowEditDialog(true)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                    <span className="ml-2 hidden sm:inline">Edit</span>
-                  </Button>
-                  <Button asChild variant="outline" size="sm">
-                    <Link to={`/dashboard/books/${book.id}`}>
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      <span className="hidden sm:inline">View Details</span>
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="ml-2 hidden sm:inline">Delete</span>
-                  </Button>
-                </div>
+              <DialogTitle className="text-xl leading-snug pr-6">{book.title}</DialogTitle>
+              {book.isbn && (
+                <DialogDescription>ISBN: {book.isbn}</DialogDescription>
+              )}
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowEditDialog(true)}
+                >
+                  <Pencil className="h-4 w-4 mr-1.5" />
+                  Edit
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <Link to={`/dashboard/books/${book.id}`}>
+                    <ExternalLink className="h-4 w-4 mr-1.5" />
+                    View Details
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4 mr-1.5" />
+                  Delete
+                </Button>
               </div>
             </DialogHeader>
 

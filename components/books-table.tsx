@@ -123,14 +123,6 @@ const columns: ColumnDef<Book>[] = [
     filterFn: "includesString",
   },
   {
-    id: "authors",
-    accessorFn: (row) => row.authors?.map((a) => a.name).join(", ") ?? "",
-    header: "Author(s)",
-    cell: ({ getValue }) => (
-      <div className="text-sm text-muted-foreground hidden md:block">{getValue() as string || "Unknown"}</div>
-    ),
-  },
-  {
     accessorKey: "genres",
     header: "Genres",
     cell: ({ row }) => (
