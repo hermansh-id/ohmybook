@@ -134,7 +134,7 @@ function AddBookPage() {
 
     setIsSubmitting(true);
     try {
-      const result = await addBookAction({
+      const result = await addBookAction({ data: {
         title: values.title,
         isbn: values.isbn,
         goodreadsUrl: values.goodreadsUrl,
@@ -144,7 +144,7 @@ function AddBookPage() {
         genreIds: selectedGenres.map((g) => g.genreId),
         coverUrl: bookPreview?.coverUrl,
         description: bookPreview?.description,
-      });
+      }});
 
       if (result.success) {
         navigate({ to: "/dashboard/books" });
@@ -166,10 +166,10 @@ function AddBookPage() {
 
     setIsAddingAuthor(true);
     try {
-      const result = await addAuthor({
+      const result = await addAuthor({ data: {
         name: newAuthorName.trim(),
         bio: newAuthorBio.trim() || undefined,
-      });
+      }});
 
       if (result.success && result.author) {
         const newAuthor = {
@@ -258,7 +258,7 @@ function AddBookPage() {
     setLookupError(null);
 
     try {
-      const result = await lookupBookByISBN(barcode.trim());
+      const result = await lookupBookByISBN({ data: { isbn: barcode.trim() } });
 
       if (!result.success || !result.data) {
         setLookupError(result.error || "Book not found");
@@ -288,7 +288,7 @@ function AddBookPage() {
           );
 
           if (!existingAuthor) {
-            const addResult = await addAuthor({ name: authorName.trim() });
+            const addResult = await addAuthor({ data: { name: authorName.trim() } });
             if (addResult.success && addResult.author) {
               const newAuthor = {
                 authorId: addResult.author.authorId,
@@ -334,7 +334,7 @@ function AddBookPage() {
     setLookupError(null);
 
     try {
-      const result = await lookupBookByISBN(isbn.trim());
+      const result = await lookupBookByISBN({ data: { isbn: isbn.trim() } });
 
       if (!result.success || !result.data) {
         setLookupError(result.error || "Book not found");
@@ -364,7 +364,7 @@ function AddBookPage() {
           );
 
           if (!existingAuthor) {
-            const addResult = await addAuthor({ name: authorName.trim() });
+            const addResult = await addAuthor({ data: { name: authorName.trim() } });
             if (addResult.success && addResult.author) {
               const newAuthor = {
                 authorId: addResult.author.authorId,
@@ -410,7 +410,7 @@ function AddBookPage() {
     setGoodreadsLookupError(null);
 
     try {
-      const result = await lookupBookByGoodreadsUrl(goodreadsUrl.trim());
+      const result = await lookupBookByGoodreadsUrl({ data: { url: goodreadsUrl.trim() } });
 
       if (!result.success || !result.data) {
         setGoodreadsLookupError(result.error || "Failed to fetch book data");
@@ -439,7 +439,7 @@ function AddBookPage() {
           );
 
           if (!existingAuthor) {
-            const addResult = await addAuthor({ name: authorName.trim() });
+            const addResult = await addAuthor({ data: { name: authorName.trim() } });
             if (addResult.success && addResult.author) {
               const newAuthor = {
                 authorId: addResult.author.authorId,
