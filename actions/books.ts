@@ -473,6 +473,60 @@ function parseBookPage(html: string, url: string): BookLookupResult {
   }
 }
 
+function parseBookMarkdown(markdown: string, url: string): BookLookupResult {
+  try {
+    const titleMatch = markdown.match(/^#\s+(.+)$/m);
+    const title = titleMatch?.[1].trim();
+
+    if (!title) {
+      return { success: false, error: "Could not extract book title" };
+    }
+
+    // Authors appear as "### [Name](.../author/show/...)" links right after the title
+    const bookAuthorsList: string[] = [];
+    const authorRegex = /###\s+\[([^\]]+)\]\(https:\/\/www\.goodreads\.com\/author\/show\/[^)]+\)/g;
+    let authorMatch: RegExpExecArray | null;
+    while ((authorMatch = authorRegex.exec(markdown)) !== null) {
+      const name = authorMatch[1].trim();
+      if (!bookAuthorsList.includes(name)) bookAuthorsList.push(name);
+    }
+
+    // Extract publication year
+    let year: number | undefined;
+    const pubMatch = markdown.match(/Published\s+.*?(\d{4})/);
+    if (pubMatch) {
+      year = parseInt(pubMatch[1]);
+    }
+
+    // Extract pages
+    let pages: number | undefined;
+    const pagesMatch = markdown.match(/(\d+)\s*pages/i);
+    if (pagesMatch) {
+      pages = parseInt(pagesMatch[1]);
+    }
+
+    // Extract cover URL (first amazon/goodreads book image)
+    const coverMatch = markdown.match(/!\[Image \d+\]\((https:\/\/[^)]+)\)/);
+    const coverUrl = coverMatch?.[1];
+
+    return {
+      success: true,
+      data: {
+        title,
+        authors: bookAuthorsList,
+        year,
+        pages,
+        goodreadsUrl: url,
+        coverUrl,
+        description: undefined,
+      },
+    };
+  } catch (error) {
+    console.error("Error parsing book markdown:", error);
+    return { success: false, error: "Failed to parse book data" };
+  }
+}
+
 export const getReadingRecommendationsAction = createServerFn({ method: "GET" })
   .handler(async () => {
     try {
@@ -574,12 +628,15 @@ export const lookupBookByGoodreadsUrl = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<BookLookupResult> => {
     try {
       // Validate URL
-      if (!data.url.includes("goodreads.com/book/show/")) {
+      if (!/goodreads\.com\/(?:[a-z]{2}\/)?book\/show\//.test(data.url)) {
         return { success: false, error: "Invalid Goodreads URL. Must be a book page URL." };
       }
 
-      // Fetch the book page
-      const response = await fetch(data.url, {
+      // Fetch the book page. Goodreads WAF-challenges direct server-side
+      // fetches of /book/show/ pages (returns 202 with an empty body), so
+      // route through the r.jina.ai reader proxy which renders the page
+      // and returns clean markdown instead.
+      const response = await fetch(`https://r.jina.ai/${data.url}`, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
         },
@@ -589,8 +646,8 @@ export const lookupBookByGoodreadsUrl = createServerFn({ method: "POST" })
         return { success: false, error: "Failed to fetch from Goodreads" };
       }
 
-      const html = await response.text();
-      return parseBookPage(html, data.url);
+      const markdown = await response.text();
+      return parseBookMarkdown(markdown, data.url);
     } catch (error) {
       console.error("Error looking up book by URL:", error);
       return { success: false, error: "An error occurred while looking up the book" };
