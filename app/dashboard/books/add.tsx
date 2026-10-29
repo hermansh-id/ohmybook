@@ -41,7 +41,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { BarcodeScanner } from "@/components/barcode-scanner";
-import { addBookAction, getAuthorsAction, lookupBookByISBN, lookupBookByGoodreadsUrl } from "@/actions/books";
+import { addBookAction, getAuthorsAction, lookupBookByISBN, lookupBookByGoodreadsUrl, lookupBookByQRCBN } from "@/actions/books";
 import { addAuthor } from "@/actions/authors";
 import { getGenresAction, addGenre } from "@/actions/genres";
 
@@ -52,6 +52,7 @@ export const Route = createFileRoute('/dashboard/books/add')({
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
   isbn: z.string().optional(),
+  qrcbn: z.string().optional(),
   goodreadsUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   year: z.number().int().min(1000).max(9999).optional().nullable(),
   pages: z.number().int().min(1).optional().nullable(),
@@ -90,6 +91,8 @@ function AddBookPage() {
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [isGoodreadsLookingUp, setIsGoodreadsLookingUp] = useState(false);
   const [goodreadsLookupError, setGoodreadsLookupError] = useState<string | null>(null);
+  const [isQrcbnLookingUp, setIsQrcbnLookingUp] = useState(false);
+  const [qrcbnLookupError, setQrcbnLookupError] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [bookPreview, setBookPreview] = useState<{
     coverUrl?: string;
@@ -102,6 +105,7 @@ function AddBookPage() {
     defaultValues: {
       title: "",
       isbn: "",
+      qrcbn: "",
       goodreadsUrl: "",
       year: null,
       pages: null,
@@ -399,6 +403,82 @@ function AddBookPage() {
     }
   }
 
+  async function handleQrcbnLookup() {
+    const qrcbn = form.getValues("qrcbn");
+    if (!qrcbn || !qrcbn.trim()) {
+      setQrcbnLookupError("Please enter a QRCBN code first");
+      return;
+    }
+
+    setIsQrcbnLookingUp(true);
+    setQrcbnLookupError(null);
+
+    try {
+      const result = await lookupBookByQRCBN({ data: { code: qrcbn.trim() } });
+
+      if (!result.success || !result.data) {
+        setQrcbnLookupError(result.error || "Book not found");
+        return;
+      }
+
+      const { data } = result;
+
+      form.setValue("title", data.title);
+      if (data.year) form.setValue("year", data.year);
+      if (data.pages) form.setValue("pages", data.pages);
+      if (data.goodreadsUrl) form.setValue("goodreadsUrl", data.goodreadsUrl);
+
+      if (data.authors && data.authors.length > 0) {
+        const authorsToSelect: Author[] = [];
+        const processedNames = new Set<string>();
+
+        for (const authorName of data.authors) {
+          const normalizedName = authorName.toLowerCase().trim();
+          if (processedNames.has(normalizedName)) {
+            continue;
+          }
+          processedNames.add(normalizedName);
+
+          let existingAuthor = authors.find(
+            (a) => a.name.toLowerCase() === normalizedName
+          );
+
+          if (!existingAuthor) {
+            const addResult = await addAuthor({ data: { name: authorName.trim() } });
+            if (addResult.success && addResult.author) {
+              const newAuthor = {
+                authorId: addResult.author.authorId,
+                name: addResult.author.name,
+              };
+              setAuthors((prev) => [...prev, newAuthor].sort((a, b) => a.name.localeCompare(b.name)));
+              existingAuthor = newAuthor;
+            }
+          }
+
+          if (existingAuthor) {
+            authorsToSelect.push(existingAuthor);
+          }
+        }
+
+        setSelectedAuthors(authorsToSelect);
+      }
+
+      setBookPreview({
+        coverUrl: data.coverUrl,
+        description: data.description,
+        goodreadsUrl: data.goodreadsUrl,
+      });
+
+      setQrcbnLookupError(null);
+    } catch (error) {
+      console.error("QRCBN lookup error:", error);
+      setQrcbnLookupError("An error occurred during lookup");
+      setBookPreview(null);
+    } finally {
+      setIsQrcbnLookingUp(false);
+    }
+  }
+
   async function handleGoodreadsLookup() {
     const goodreadsUrl = form.getValues("goodreadsUrl");
     if (!goodreadsUrl || !goodreadsUrl.trim()) {
@@ -528,6 +608,42 @@ function AddBookPage() {
                 )}
                 <p className="text-sm text-muted-foreground">
                   Scan the barcode or enter ISBN manually, then click Lookup
+                </p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="qrcbn"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>QRCBN</FormLabel>
+                <div className="flex gap-2">
+                  <FormControl>
+                    <Input placeholder="Enter QRCBN code" {...field} />
+                  </FormControl>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleQrcbnLookup}
+                    disabled={isQrcbnLookingUp}
+                    className="shrink-0"
+                  >
+                    {isQrcbnLookingUp ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                    <span className="ml-2 hidden sm:inline">Lookup</span>
+                  </Button>
+                </div>
+                {qrcbnLookupError && (
+                  <p className="text-sm text-destructive mt-1">{qrcbnLookupError}</p>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  For self-published books without ISBN, enter the QRCBN code
                 </p>
                 <FormMessage />
               </FormItem>

@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getAllBooksWithDetails, getBookById } from "@/lib/db/queries";
 import { db } from "@/lib/db";
 import { books, authors, bookAuthors, goodreadsData, bookGenres } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, or, sql } from "drizzle-orm";
 import * as cheerio from "cheerio";
 
 export const getBooksAction = createServerFn({ method: "GET" })
@@ -156,14 +156,37 @@ export interface AddBookInput {
 
 export const addBookAction = createServerFn({ method: "POST" })
   .validator((d: AddBookInput) => d)
-  .handler(async ({ data }) => {
+  .handler(({ data }) => addBook(data));
+
+export async function addBook(data: AddBookInput) {
     try {
+      // Never create duplicates: same ISBN/QRCBN, or same title (case-insensitive)
+      const isbn = data.isbn?.replace(/[-\s]/g, "") || null;
+      const [existing] = await db
+        .select({ bookId: books.bookId, title: books.title })
+        .from(books)
+        .where(
+          isbn
+            ? or(eq(books.isbn, isbn), sql`lower(${books.title}) = lower(${data.title.trim()})`)
+            : sql`lower(${books.title}) = lower(${data.title.trim()})`
+        )
+        .limit(1);
+
+      if (existing) {
+        return {
+          success: false,
+          duplicate: true,
+          bookId: existing.bookId,
+          error: `Book already exists: "${existing.title}"`,
+        };
+      }
+
       // Insert the book
       const [book] = await db
         .insert(books)
         .values({
-          title: data.title,
-          isbn: data.isbn || null,
+          title: data.title.trim(),
+          isbn,
           goodreadsUrl: data.goodreadsUrl || null,
           year: data.year || null,
           pages: data.pages || null,
@@ -211,7 +234,7 @@ export const addBookAction = createServerFn({ method: "POST" })
       console.error("Error adding book:", error);
       return { success: false, error: "Failed to add book" };
     }
-  });
+}
 
 export const deleteBookAction = createServerFn({ method: "POST" })
   .validator((d: { bookId: number }) => d)
@@ -314,10 +337,12 @@ export interface BookLookupResult {
 
 export const lookupBookByISBN = createServerFn({ method: "POST" })
   .validator((d: { isbn: string }) => d)
-  .handler(async ({ data }): Promise<BookLookupResult> => {
+  .handler(({ data }) => lookupIsbn(data.isbn));
+
+export async function lookupIsbn(isbn: string): Promise<BookLookupResult> {
     try {
       // Clean ISBN (remove hyphens and spaces)
-      const cleanIsbn = data.isbn.replace(/[-\s]/g, "");
+      const cleanIsbn = isbn.replace(/[-\s]/g, "");
 
       // Validate ISBN (10 or 13 digits)
       if (!/^\d{10}(\d{3})?$/.test(cleanIsbn)) {
@@ -350,7 +375,25 @@ export const lookupBookByISBN = createServerFn({ method: "POST" })
       if (response.ok && response.url.includes("/book/show/")) {
         const html = await response.text();
         console.log("[ISBN Lookup] Got book page directly, HTML length:", html.length);
-        return parseBookPage(html, response.url);
+        const direct = parseBookPage(html, response.url);
+        if (direct.success) return direct;
+
+        // Goodreads WAF-challenges server-side fetches (202 + empty body), but
+        // the redirect already resolved the book URL. Read the page through
+        // the reader proxy, same as lookupBookByGoodreadsUrl.
+        // Ask for rendered HTML: the markdown output truncates titles and
+        // drops authors/description on pages with long review lists.
+        const proxied = await fetch(`https://r.jina.ai/${response.url}`, {
+          headers: {
+            "User-Agent": browserHeaders["User-Agent"],
+            "X-Return-Format": "html",
+          },
+        });
+        if (proxied.ok) {
+          const rendered = parseBookPage(await proxied.text(), response.url);
+          if (rendered.success) return rendered;
+        }
+        return direct;
       }
 
       // Fallback to search if direct ISBN URL didn't work
@@ -401,7 +444,7 @@ export const lookupBookByISBN = createServerFn({ method: "POST" })
       console.error("Error looking up book:", error);
       return { success: false, error: "An error occurred while looking up the book" };
     }
-  });
+}
 
 function parseBookPage(html: string, url: string): BookLookupResult {
   try {
@@ -420,7 +463,7 @@ function parseBookPage(html: string, url: string): BookLookupResult {
     const bookAuthorsList: string[] = [];
     $('span[data-testid="name"]').each((_, el) => {
       const authorName = $(el).text().trim();
-      if (authorName) bookAuthorsList.push(authorName);
+      if (authorName && !bookAuthorsList.includes(authorName)) bookAuthorsList.push(authorName);
     });
 
     // Fallback for authors
@@ -475,7 +518,11 @@ function parseBookPage(html: string, url: string): BookLookupResult {
 
 function parseBookMarkdown(markdown: string, url: string): BookLookupResult {
   try {
-    const titleMatch = markdown.match(/^#\s+(.+)$/m);
+    // The reader proxy sometimes captures the page before the book-detail
+    // section finishes rendering (dynamic content, e.g. long review lists),
+    // in which case there's no "# Title" heading. Fall back to the "Title:"
+    // metadata line the proxy always prepends to its output.
+    const titleMatch = markdown.match(/^#\s+(.+)$/m) || markdown.match(/^Title:\s+(.+)$/m);
     const title = titleMatch?.[1].trim();
 
     if (!title) {
@@ -525,6 +572,129 @@ function parseBookMarkdown(markdown: string, url: string): BookLookupResult {
     console.error("Error parsing book markdown:", error);
     return { success: false, error: "Failed to parse book data" };
   }
+}
+
+const GOODREADS_BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Cache-Control": "no-cache",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Upgrade-Insecure-Requests": "1",
+};
+
+// Best-effort Goodreads lookup by free-text query (title + author). Used to
+// enrich data from sources that don't carry an ISBN, like QRCBN. Returns
+// null (rather than an error) on any failure so callers can fall back to
+// their own data.
+async function searchGoodreadsByQuery(query: string): Promise<BookLookupResult | null> {
+  try {
+    const searchUrl = `https://www.goodreads.com/search?utf8=%E2%9C%93&q=${encodeURIComponent(query)}&search_type=books`;
+    const searchResponse = await fetch(searchUrl, {
+      redirect: "follow",
+      headers: GOODREADS_BROWSER_HEADERS,
+    });
+
+    if (!searchResponse.ok) return null;
+
+    const html = await searchResponse.text();
+    const currentUrl = searchResponse.url;
+
+    if (currentUrl.includes("/book/show/")) {
+      const result = parseBookPage(html, currentUrl);
+      return result.success ? result : null;
+    }
+
+    const $ = cheerio.load(html);
+    const firstBookLink =
+      $('a.bookTitle').first().attr('href') ||
+      $('a[href*="/book/show/"]').first().attr('href');
+
+    if (!firstBookLink) return null;
+
+    const bookUrl = firstBookLink.startsWith("http")
+      ? firstBookLink
+      : `https://www.goodreads.com${firstBookLink}`;
+
+    const bookResponse = await fetch(bookUrl, { headers: GOODREADS_BROWSER_HEADERS });
+    if (!bookResponse.ok) return null;
+
+    const result = parseBookPage(await bookResponse.text(), bookUrl);
+    return result.success ? result : null;
+  } catch (error) {
+    console.error("Error searching Goodreads by query:", error);
+    return null;
+  }
+}
+
+export const lookupBookByQRCBN = createServerFn({ method: "POST" })
+  .validator((d: { code: string }) => d)
+  .handler(({ data }) => lookupQrcbn(data.code));
+
+export async function lookupQrcbn(rawCode: string): Promise<BookLookupResult> {
+    try {
+      // Accept a bare code, a dashed code or a full qrcbn.com/check/ URL
+      const digits = rawCode.split("/check/").pop()!.replace(/\D/g, "");
+
+      if (!/^\d{6,20}$/.test(digits)) {
+        return { success: false, error: "Invalid QRCBN code" };
+      }
+
+      // The API only matches the dashed form (62-XXXX-XXXX-XXX); the bare
+      // digits return `naskah: null`.
+      const code = /^62\d{11}$/.test(digits)
+        ? `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6, 10)}-${digits.slice(10)}`
+        : digits;
+
+      const response = await fetch(`https://my.qrcbn.com/api/naskah/${code}`, {
+        headers: { Accept: "application/json" },
+      });
+
+      if (!response.ok) {
+        return { success: false, error: "Failed to fetch from QRCBN" };
+      }
+
+      const json = await response.json();
+      const naskah = json?.data?.naskah;
+
+      if (!naskah || !naskah.title) {
+        return { success: false, error: "QRCBN code not found" };
+      }
+
+      const yearMatch =
+        typeof naskah.publish_date === "string" ? naskah.publish_date.match(/(\d{4})/) : null;
+
+      const bookData: NonNullable<BookLookupResult["data"]> = {
+        title: naskah.title,
+        authors: naskah.author ? [naskah.author] : [],
+        year: yearMatch ? parseInt(yearMatch[1]) : undefined,
+        pages: parseInt(naskah.page) || undefined,
+        goodreadsUrl: "",
+        coverUrl: /^https?:\/\//.test(naskah.cover_url) ? naskah.cover_url : undefined,
+        description: naskah.description ?? undefined,
+      };
+
+      // QRCBN books rarely carry an ISBN, so match Goodreads by title+author
+      // instead. Best-effort only — QRCBN data always wins on conflicts.
+      const enriched = await searchGoodreadsByQuery(
+        [bookData.title, bookData.authors[0]].filter(Boolean).join(" ")
+      );
+
+      if (enriched?.data) {
+        bookData.goodreadsUrl = enriched.data.goodreadsUrl;
+        bookData.coverUrl = bookData.coverUrl ?? enriched.data.coverUrl;
+        bookData.description = bookData.description ?? enriched.data.description;
+        bookData.year = bookData.year ?? enriched.data.year;
+        bookData.pages = bookData.pages ?? enriched.data.pages;
+      }
+
+      return { success: true, data: bookData };
+    } catch (error) {
+      console.error("Error looking up book by QRCBN:", error);
+      return { success: false, error: "An error occurred while looking up the book" };
+    }
 }
 
 export const getReadingRecommendationsAction = createServerFn({ method: "GET" })
@@ -625,7 +795,10 @@ export const getReadingRecommendationsAction = createServerFn({ method: "GET" })
 
 export const lookupBookByGoodreadsUrl = createServerFn({ method: "POST" })
   .validator((d: { url: string }) => d)
-  .handler(async ({ data }): Promise<BookLookupResult> => {
+  .handler(({ data }) => lookupGoodreadsUrl(data.url));
+
+export async function lookupGoodreadsUrl(url: string): Promise<BookLookupResult> {
+    const data = { url };
     try {
       // Validate URL
       if (!/goodreads\.com\/(?:[a-z]{2}\/)?book\/show\//.test(data.url)) {
@@ -636,10 +809,21 @@ export const lookupBookByGoodreadsUrl = createServerFn({ method: "POST" })
       // fetches of /book/show/ pages (returns 202 with an empty body), so
       // route through the r.jina.ai reader proxy which renders the page
       // and returns clean markdown instead.
+      const userAgent =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
+
+      // Rendered HTML first: the markdown output truncates titles and drops
+      // authors/description on pages with long review lists.
+      const htmlResponse = await fetch(`https://r.jina.ai/${data.url}`, {
+        headers: { "User-Agent": userAgent, "X-Return-Format": "html" },
+      });
+      if (htmlResponse.ok) {
+        const rendered = parseBookPage(await htmlResponse.text(), data.url);
+        if (rendered.success) return rendered;
+      }
+
       const response = await fetch(`https://r.jina.ai/${data.url}`, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        },
+        headers: { "User-Agent": userAgent },
       });
 
       if (!response.ok) {
@@ -652,7 +836,7 @@ export const lookupBookByGoodreadsUrl = createServerFn({ method: "POST" })
       console.error("Error looking up book by URL:", error);
       return { success: false, error: "An error occurred while looking up the book" };
     }
-  });
+}
 
 export const fetchGoodreadsDataAction = createServerFn({ method: "POST" })
   .validator((d: { bookId: number; isbn: string }) => d)
