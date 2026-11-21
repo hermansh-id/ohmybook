@@ -19,8 +19,7 @@ const db = drizzle(client, { schema });
 
 beforeAll(async () => {
   await migrate(db, { migrationsFolder: "./drizzle" });
-  // Same index as lib/db/schema/core.ts (applied by `db:push` in real DBs)
-  await db.execute(sql`CREATE UNIQUE INDEX uq_authors_name_lower ON authors (lower(name))`);
+  // uq_authors_name_lower comes from drizzle/0001
 });
 
 beforeEach(async () => {

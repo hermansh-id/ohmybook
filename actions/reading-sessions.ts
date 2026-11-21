@@ -7,6 +7,7 @@ import {
   deleteReadingSession,
 } from "@/lib/db/queries";
 import { db } from "@/lib/db";
+import { computeLogUpdate } from "@/lib/db/reading-progress";
 import { books, readingLog } from "@/lib/db/schema";
 import { eq, or, isNull } from "drizzle-orm";
 
@@ -76,44 +77,32 @@ export const createReadingSessionAction = createServerFn({ method: "POST" })
         .where(eq(readingLog.bookId, data.bookId))
         .limit(1);
 
-      const pagesRead = data.pagesRead || 0;
-      const currentPage = (log?.currentPage || 0) + pagesRead;
-      const totalPages = book.pages || 0;
-      const isCompleted = totalPages > 0 && currentPage >= totalPages;
+      const update = computeLogUpdate(log, book.pages, data.pagesRead, data.sessionDate);
+      const isCompleted = update.isCompleted;
 
       if (!log) {
         // Create new reading_log entry
-        const newLogData: any = {
-          bookId: data.bookId,
-          currentPage: isCompleted ? totalPages : currentPage,
-          status: isCompleted ? "finished" : "reading",
-          dateStarted: new Date(data.sessionDate),
-        };
-
-        if (isCompleted) {
-          newLogData.dateFinished = new Date(data.sessionDate);
-        }
-
         [log] = await db
           .insert(readingLog)
-          .values(newLogData)
+          .values({
+            bookId: data.bookId,
+            currentPage: update.currentPage,
+            status: update.status,
+            dateStarted: update.dateStarted,
+            ...(update.dateFinished ? { dateFinished: update.dateFinished } : {}),
+          })
           .returning();
       } else {
         // Update existing reading_log entry
-        const updateData: any = {
-          currentPage: isCompleted ? totalPages : currentPage,
-          status: isCompleted ? "finished" : log.status === "want_to_read" ? "reading" : log.status,
-          dateStarted: log.dateStarted || new Date(data.sessionDate),
-          updatedAt: new Date(),
-        };
-
-        if (isCompleted) {
-          updateData.dateFinished = new Date(data.sessionDate);
-        }
-
         [log] = await db
           .update(readingLog)
-          .set(updateData)
+          .set({
+            currentPage: update.currentPage,
+            status: update.status,
+            dateStarted: update.dateStarted,
+            updatedAt: new Date(),
+            ...(update.dateFinished ? { dateFinished: update.dateFinished } : {}),
+          })
           .where(eq(readingLog.bookId, data.bookId))
           .returning();
       }

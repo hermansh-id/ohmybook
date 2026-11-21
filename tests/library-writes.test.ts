@@ -13,7 +13,7 @@ const db = drizzle(new PGlite(), { schema });
 
 beforeAll(async () => {
   await migrate(db, { migrationsFolder: "./drizzle" });
-  await db.execute(sql`CREATE UNIQUE INDEX uq_authors_name_lower ON authors (lower(name))`);
+  // uq_authors_name_lower comes from drizzle/0001
 });
 beforeEach(async () => {
   await db.execute(sql`TRUNCATE books, authors, genres RESTART IDENTITY CASCADE`);
