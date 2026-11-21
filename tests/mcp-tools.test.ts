@@ -14,7 +14,7 @@ test("MCP server exposes Goodreads tools and validates lookup_book input", async
 
   const { tools } = await client.listTools();
   const names = tools.map((t) => t.name);
-  for (const n of ["lookup_book", "refresh_goodreads_data", "get_reading_recommendations", "add_book"]) {
+  for (const n of ["lookup_book", "refresh_goodreads_data", "get_reading_recommendations", "add_book", "update_book"]) {
     expect(names).toContain(n);
   }
   const lookup = tools.find((t) => t.name === "lookup_book")!;

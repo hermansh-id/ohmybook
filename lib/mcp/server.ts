@@ -1,5 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { db } from "@/lib/db";
+import { BookInputError } from "@/lib/db/book-writes";
+import { READING_STATUSES, updateBookReading } from "@/lib/db/reading-writes";
 import {
   searchBooks,
   getBookById,
@@ -235,6 +238,35 @@ export function createMcpServer() {
     },
     async ({ sessionDate, ...rest }) =>
       json(await createReadingSession({ ...rest, sessionDate: new Date(sessionDate) })),
+  );
+
+  server.registerTool(
+    "update_book",
+    {
+      title: "Update book reading status",
+      description:
+        "Set a book's reading status and/or rating (creates the reading log entry if the book has none). Status: want_to_read, reading, finished, did_not_finish, on_hold. Rating: 1-5. Setting 'finished' stamps today as the finish date and 'reading' as the start date unless already set or given. Only the provided fields change.",
+      inputSchema: {
+        bookId: z.number().int(),
+        status: z.enum(READING_STATUSES).optional(),
+        rating: z.number().int().min(1).max(5).optional(),
+        review: z.string().optional(),
+        currentPage: z.number().int().min(0).optional(),
+        dateStarted: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("YYYY-MM-DD"),
+        dateFinished: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("YYYY-MM-DD"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (input) => {
+      try {
+        return json({ success: true, readingLog: await updateBookReading(db, input) });
+      } catch (error) {
+        if (error instanceof BookInputError) {
+          return { isError: true, ...json({ success: false, error: error.message }) };
+        }
+        throw error;
+      }
+    },
   );
 
   server.registerTool(
