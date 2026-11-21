@@ -3,11 +3,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  addPlanItemsAction,
   cancelPriorityAction,
+  completePlanItemAction,
   completePriorityAction,
+  deletePlanItemAction,
+  getPlannerRangeAction,
   getPrioritiesAction,
   getPriorityChangesAction,
+  reopenPlanItemAction,
+  reschedulePlanItemAction,
   setPriorityAction,
+  skipPlanItemAction,
+  updatePlanItemAction,
 } from "@/actions/planning";
 
 type Result<T> = { success: true; data: T } | { success: false; error: string };
@@ -20,6 +28,7 @@ function unwrap<T>(result: Result<T>): T {
 export const planningKeys = {
   priorities: ["priorities"] as const,
   priorityChanges: ["priority-changes"] as const,
+  planner: ["planner"] as const,
 };
 
 /** Everything a planning change can affect. */
@@ -82,3 +91,34 @@ export const useCompletePriority = () =>
   usePlanningMutation((bookId: number) => completePriorityAction({ data: { bookId } }), { success: "Marked as completed" });
 export const useCancelPriority = () =>
   usePlanningMutation((bookId: number) => cancelPriorityAction({ data: { bookId } }), { success: "Priority cancelled" });
+
+// ------------------------------------------------------------------- planner
+export function usePlanner(from: string, to: string) {
+  return useQuery({
+    queryKey: [...planningKeys.planner, from, to],
+    queryFn: async () => unwrap(await getPlannerRangeAction({ data: { from, to } })),
+    staleTime: 1000 * 30,
+    placeholderData: (prev) => prev,
+  });
+}
+
+type Vars<F extends (...args: never[]) => unknown> = Parameters<F>[0] extends { data: infer D } ? D : never;
+
+export const useAddPlanItems = () =>
+  usePlanningMutation((vars: Vars<typeof addPlanItemsAction>) => addPlanItemsAction({ data: vars }), {
+    success: (items) => (items.length === 1 ? "Added to your plan" : `${items.length} reading plans added`),
+  });
+export const useUpdatePlanItem = () =>
+  usePlanningMutation((vars: Vars<typeof updatePlanItemAction>) => updatePlanItemAction({ data: vars }), { success: "Plan updated" });
+export const useSkipPlanItem = () =>
+  usePlanningMutation((vars: Vars<typeof skipPlanItemAction>) => skipPlanItemAction({ data: vars }), { success: "Skipped. You can reopen it any time." });
+export const useReopenPlanItem = () =>
+  usePlanningMutation((vars: Vars<typeof reopenPlanItemAction>) => reopenPlanItemAction({ data: vars }), { success: "Back on the plan" });
+export const useReschedulePlanItem = () =>
+  usePlanningMutation((vars: Vars<typeof reschedulePlanItemAction>) => reschedulePlanItemAction({ data: vars }), { success: "Rescheduled" });
+export const useDeletePlanItem = () =>
+  usePlanningMutation((vars: Vars<typeof deletePlanItemAction>) => deletePlanItemAction({ data: vars }), { success: "Removed from your plan" });
+export const useCompletePlanItem = () =>
+  usePlanningMutation((vars: Vars<typeof completePlanItemAction>) => completePlanItemAction({ data: vars }), {
+    success: (r) => (r.bookCompleted ? "Logged. You finished the book!" : "Reading logged"),
+  });

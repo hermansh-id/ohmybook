@@ -6,11 +6,21 @@ import { addAuthor, addGenre, deleteBook, updateBookDetails } from "@/lib/db/lib
 import { READING_STATUSES, updateBookReading } from "@/lib/db/reading-writes";
 import {
   PRIORITY_LEVELS,
+  TIMES_OF_DAY,
+  PLAN_KINDS,
+  addPlanItems,
   closePriority,
+  completePlanItem,
+  createPlanWithItems,
+  deletePlanItem,
   getPriorityChanges,
   listPriorities,
+  reschedulePlanItem,
   setPriority,
+  skipPlanItem,
 } from "@/lib/db/planning-writes";
+import { getPlannerRange } from "@/lib/db/planning-reads";
+import { addDays, todayInTimezone, weekStartKey } from "@/lib/dates";
 import {
   searchBooks,
   getBookById,
@@ -646,6 +656,146 @@ export function createMcpServer() {
       annotations: IDEMPOTENT_WRITE,
     },
     async ({ bookId, outcome }) => run(async () => ({ success: true, priority: await closePriority(db, bookId, outcome) })),
+  );
+
+  server.registerTool(
+    "list_reading_plan",
+    {
+      title: "List reading plan",
+      description:
+        "Planned reading activities (with itemId, status planned/completed/skipped/rescheduled, planned vs actual amounts), plus actual sessions, priority target dates and finished books, between two dates. Default: this week (Monday to Sunday).",
+      inputSchema: { from: dateStr.optional(), to: dateStr.optional() },
+      annotations: READ,
+    },
+    async ({ from, to }) =>
+      run(async () => {
+        const start = from ?? weekStartKey(todayInTimezone());
+        return getPlannerRange(db, start, to ?? addDays(start, 6));
+      }),
+  );
+
+  server.registerTool(
+    "plan_reading",
+    {
+      title: "Plan reading",
+      description:
+        "Schedule reading on specific days: one or several items (different books/days/times of day), optionally repeating on weekdays for N weeks, optionally grouped in a named plan such as a weekend plan. Planned amounts are intentions, not rules.",
+      inputSchema: {
+        items: z
+          .array(
+            z.object({
+              bookId: z.number().int(),
+              date: dateStr,
+              timeOfDay: z.enum(TIMES_OF_DAY).optional(),
+              pages: z.number().int().min(0).optional(),
+              minutes: z.number().int().min(0).optional(),
+              startPage: z.number().int().min(0).optional(),
+              endPage: z.number().int().min(0).optional(),
+              notes: z.string().optional(),
+            }),
+          )
+          .min(1)
+          .max(50),
+        repeat: z
+          .object({
+            weekdays: z.array(z.number().int().min(0).max(6)).min(1).describe("0=Mon ... 6=Sun"),
+            weeks: z.number().int().min(1).max(26),
+          })
+          .optional()
+          .describe("Repeat each item on these weekdays for N weeks, starting at its date"),
+        plan: z
+          .object({ title: z.string().min(1), kind: z.enum(PLAN_KINDS).optional() })
+          .optional()
+          .describe("Group the items in a named plan"),
+      },
+      annotations: WRITE,
+    },
+    async ({ items, repeat, plan }) =>
+      run(async () => {
+        const mapped = items.map((i) => ({
+          bookId: i.bookId,
+          scheduledDate: i.date,
+          timeOfDay: i.timeOfDay,
+          plannedPages: i.pages,
+          plannedMinutes: i.minutes,
+          plannedStartPage: i.startPage,
+          plannedEndPage: i.endPage,
+          notes: i.notes,
+        }));
+        if (plan) {
+          const dates = mapped.map((m) => m.scheduledDate).sort();
+          const result = await createPlanWithItems(
+            db,
+            { title: plan.title, kind: plan.kind, startDate: dates[0], endDate: dates[dates.length - 1] },
+            mapped,
+            repeat,
+          );
+          return { success: true, plan: result.plan, items: result.items };
+        }
+        return { success: true, items: await addPlanItems(db, mapped, { repeat }) };
+      }),
+  );
+
+  server.registerTool(
+    "complete_plan_item",
+    {
+      title: "Log a planned reading as done",
+      description:
+        "Mark a plan item done. Creates exactly one reading session and updates the book's progress, or pass linkSessionId to attach a session already logged (no duplicate). Amounts default to the planned ones; the original plan is preserved for comparison. sessionDate defaults to today.",
+      inputSchema: {
+        itemId: z.number().int(),
+        actualPages: z.number().int().min(0).optional(),
+        actualMinutes: z.number().int().min(0).optional(),
+        startPage: z.number().int().min(0).optional(),
+        endPage: z.number().int().min(0).optional(),
+        sessionDate: dateStr.optional(),
+        notes: z.string().optional(),
+        linkSessionId: z.number().int().optional(),
+      },
+      annotations: WRITE,
+    },
+    async ({ itemId, ...input }) =>
+      run(async () => ({
+        success: true,
+        ...(await completePlanItem(db, itemId, {
+          ...input,
+          sessionDate: input.linkSessionId ? undefined : (input.sessionDate ?? todayInTimezone()),
+        })),
+      })),
+  );
+
+  server.registerTool(
+    "reschedule_plan_item",
+    {
+      title: "Reschedule a plan item",
+      description: "Move a planned (or skipped) item to another day. The original is kept as history.",
+      inputSchema: { itemId: z.number().int(), date: dateStr, timeOfDay: z.enum(TIMES_OF_DAY).optional() },
+      annotations: WRITE,
+    },
+    async ({ itemId, date, timeOfDay }) =>
+      run(async () => ({ success: true, item: await reschedulePlanItem(db, itemId, { scheduledDate: date, timeOfDay }) })),
+  );
+
+  server.registerTool(
+    "skip_plan_item",
+    {
+      title: "Skip a plan item",
+      description: "Skip a planned item. Skipping is fine and reversible; it is not a failure.",
+      inputSchema: { itemId: z.number().int(), note: z.string().optional() },
+      annotations: IDEMPOTENT_WRITE,
+    },
+    async ({ itemId, note }) => run(async () => ({ success: true, item: await skipPlanItem(db, itemId, note) })),
+  );
+
+  server.registerTool(
+    "remove_plan_item",
+    {
+      title: "Remove a plan item",
+      description: "Delete a planned/skipped item from the plan. Completed items cannot be removed.",
+      inputSchema: { itemId: z.number().int() },
+      annotations: DESTRUCTIVE,
+    },
+    async ({ itemId }) => run(async () => ({ success: true, removed: await deletePlanItem(db, itemId) })),
   );
 
   return server;

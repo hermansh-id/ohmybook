@@ -14,6 +14,7 @@ import {
   IconBulb,
   IconQuote,
   IconFlag3,
+  IconCalendarEvent,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -60,6 +61,11 @@ const data = {
       title: "Priorities",
       url: "/dashboard/priorities",
       icon: IconFlag3,
+    },
+    {
+      title: "Planner",
+      url: "/dashboard/planner",
+      icon: IconCalendarEvent,
     },
     {
       title: "Recommendations",
