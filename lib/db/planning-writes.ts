@@ -7,10 +7,14 @@ import {
   readingPriorities,
   readingPriorityHistory,
   readingSessions,
+  weeklyReadingReviews,
 } from "./schema";
 import { BookInputError, runAtomic } from "./book-writes";
 import { computeLogUpdate } from "./reading-progress";
-import { addDays, isDateKey, weekdayIndex } from "@/lib/dates";
+import { addDays, isDateKey, weekStartKey, weekdayIndex } from "@/lib/dates";
+import { getWeekSummary } from "./planning-reads";
+
+export { getPriorityChanges, type PriorityChange } from "./planning-reads";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDb = any;
@@ -134,17 +138,6 @@ export interface PriorityRow {
   coverUrl: string | null;
 }
 
-export interface PriorityChange {
-  historyId: number;
-  bookId: number;
-  title: string;
-  fromLevel: string | null;
-  toLevel: string | null;
-  fromStatus: string | null;
-  toStatus: string | null;
-  createdAt: Date | null;
-}
-
 export async function listPriorities(
   database: AnyDb,
   opts: { status?: "active" | "completed" | "cancelled" | "all" } = {},
@@ -166,32 +159,6 @@ export async function listPriorities(
     .where(status === "all" ? undefined : eq(readingPriorities.status, status))
     .orderBy(asc(LEVEL_RANK), sql`${readingPriorities.targetDate} ASC NULLS LAST`, asc(readingPriorities.priorityId));
   return rows as PriorityRow[];
-}
-
-/** Priority changes since a date (inclusive), newest first. */
-export async function getPriorityChanges(
-  database: AnyDb,
-  opts: { sinceDate?: string; untilDate?: string; limit?: number } = {},
-): Promise<PriorityChange[]> {
-  const conds = [];
-  if (opts.sinceDate) conds.push(sql`${readingPriorityHistory.createdAt} >= ${opts.sinceDate}::date`);
-  if (opts.untilDate) conds.push(sql`${readingPriorityHistory.createdAt} < (${opts.untilDate}::date + 1)`);
-  return database
-    .select({
-      historyId: readingPriorityHistory.historyId,
-      bookId: books.bookId,
-      title: books.title,
-      fromLevel: readingPriorityHistory.fromLevel,
-      toLevel: readingPriorityHistory.toLevel,
-      fromStatus: readingPriorityHistory.fromStatus,
-      toStatus: readingPriorityHistory.toStatus,
-      createdAt: readingPriorityHistory.createdAt,
-    })
-    .from(readingPriorityHistory)
-    .innerJoin(books, eq(readingPriorityHistory.bookId, books.bookId))
-    .where(conds.length ? and(...conds) : undefined)
-    .orderBy(sql`${readingPriorityHistory.createdAt} DESC`, sql`${readingPriorityHistory.historyId} DESC`)
-    .limit(opts.limit ?? 50);
 }
 
 // ============================================================================
@@ -577,4 +544,59 @@ export async function createPlanWithItems(
     await database.delete(readingPlans).where(eq(readingPlans.planId, created.planId));
     throw error;
   }
+}
+
+// ============================================================================
+// WEEKLY REVIEW
+// ============================================================================
+
+export interface SaveWeeklyReviewInput {
+  /** Any date in the week; normalized to that week's Monday. */
+  weekStart: string;
+  /** undefined = keep what was saved, "" = clear */
+  wentWell?: string;
+  blockers?: string;
+  nextWeekChanges?: string;
+}
+
+const MAX_REFLECTION = 4000;
+
+/**
+ * Save the reflection for a week and snapshot the week's numbers, so the
+ * history keeps showing what the week looked like when it was reviewed.
+ */
+export async function saveWeeklyReview(database: AnyDb, input: SaveWeeklyReviewInput) {
+  if (!isDateKey(input.weekStart)) throw new BookInputError("weekStart must be a valid YYYY-MM-DD date");
+  for (const k of ["wentWell", "blockers", "nextWeekChanges"] as const) {
+    if ((input[k]?.length ?? 0) > MAX_REFLECTION) throw new BookInputError(`${k} is too long (max ${MAX_REFLECTION} characters)`);
+  }
+  const weekStart = weekStartKey(input.weekStart);
+  const summary = await getWeekSummary(database, weekStart);
+
+  const clean = (v: string | undefined) => (v === undefined ? undefined : v.trim() || null);
+  const reflections = {
+    ...(input.wentWell !== undefined ? { wentWell: clean(input.wentWell) } : {}),
+    ...(input.blockers !== undefined ? { blockers: clean(input.blockers) } : {}),
+    ...(input.nextWeekChanges !== undefined ? { nextWeekChanges: clean(input.nextWeekChanges) } : {}),
+  };
+  const snapshot = {
+    plannedItems: summary.activities.total,
+    completedItems: summary.activities.completed,
+    skippedItems: summary.activities.skipped,
+    plannedPages: summary.pages.planned,
+    actualPages: summary.pages.actualFromPlans,
+    totalPagesRead: summary.pages.totalRead,
+    totalMinutes: summary.minutesRead,
+    booksCompleted: summary.booksCompleted.length,
+  };
+
+  const [saved] = await database
+    .insert(weeklyReadingReviews)
+    .values({ weekStart, ...reflections, ...snapshot })
+    .onConflictDoUpdate({
+      target: weeklyReadingReviews.weekStart,
+      set: { ...reflections, ...snapshot, updatedAt: new Date() },
+    })
+    .returning();
+  return saved as typeof weeklyReadingReviews.$inferSelect;
 }

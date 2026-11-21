@@ -29,6 +29,7 @@ import { Route as DashboardPrioritiesIndexRouteImport } from './app/dashboard/pr
 import { Route as DashboardQuotesIndexRouteImport } from './app/dashboard/quotes/index'
 import { Route as DashboardReadingLogIndexRouteImport } from './app/dashboard/reading-log/index'
 import { Route as DashboardRecommendationsIndexRouteImport } from './app/dashboard/recommendations/index'
+import { Route as DashboardReviewsIndexRouteImport } from './app/dashboard/reviews/index'
 import { Route as DashboardSettingsIndexRouteImport } from './app/dashboard/settings/index'
 import { Route as DashboardStatisticsIndexRouteImport } from './app/dashboard/statistics/index'
 
@@ -137,6 +138,11 @@ const DashboardRecommendationsIndexRoute =
     path: '/recommendations/',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardReviewsIndexRoute = DashboardReviewsIndexRouteImport.update({
+  id: '/reviews/',
+  path: '/reviews/',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardSettingsIndexRoute = DashboardSettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
@@ -170,6 +176,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/quotes/': typeof DashboardQuotesIndexRoute
   '/dashboard/reading-log/': typeof DashboardReadingLogIndexRoute
   '/dashboard/recommendations/': typeof DashboardRecommendationsIndexRoute
+  '/dashboard/reviews/': typeof DashboardReviewsIndexRoute
   '/dashboard/settings/': typeof DashboardSettingsIndexRoute
   '/dashboard/statistics/': typeof DashboardStatisticsIndexRoute
 }
@@ -193,6 +200,7 @@ export interface FileRoutesByTo {
   '/dashboard/quotes': typeof DashboardQuotesIndexRoute
   '/dashboard/reading-log': typeof DashboardReadingLogIndexRoute
   '/dashboard/recommendations': typeof DashboardRecommendationsIndexRoute
+  '/dashboard/reviews': typeof DashboardReviewsIndexRoute
   '/dashboard/settings': typeof DashboardSettingsIndexRoute
   '/dashboard/statistics': typeof DashboardStatisticsIndexRoute
 }
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/dashboard/quotes/': typeof DashboardQuotesIndexRoute
   '/dashboard/reading-log/': typeof DashboardReadingLogIndexRoute
   '/dashboard/recommendations/': typeof DashboardRecommendationsIndexRoute
+  '/dashboard/reviews/': typeof DashboardReviewsIndexRoute
   '/dashboard/settings/': typeof DashboardSettingsIndexRoute
   '/dashboard/statistics/': typeof DashboardStatisticsIndexRoute
 }
@@ -244,6 +253,7 @@ export interface FileRouteTypes {
     | '/dashboard/quotes/'
     | '/dashboard/reading-log/'
     | '/dashboard/recommendations/'
+    | '/dashboard/reviews/'
     | '/dashboard/settings/'
     | '/dashboard/statistics/'
   fileRoutesByTo: FileRoutesByTo
@@ -267,6 +277,7 @@ export interface FileRouteTypes {
     | '/dashboard/quotes'
     | '/dashboard/reading-log'
     | '/dashboard/recommendations'
+    | '/dashboard/reviews'
     | '/dashboard/settings'
     | '/dashboard/statistics'
   id:
@@ -291,6 +302,7 @@ export interface FileRouteTypes {
     | '/dashboard/quotes/'
     | '/dashboard/reading-log/'
     | '/dashboard/recommendations/'
+    | '/dashboard/reviews/'
     | '/dashboard/settings/'
     | '/dashboard/statistics/'
   fileRoutesById: FileRoutesById
@@ -448,6 +460,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRecommendationsIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/reviews/': {
+      id: '/dashboard/reviews/'
+      path: '/reviews'
+      fullPath: '/dashboard/reviews/'
+      preLoaderRoute: typeof DashboardReviewsIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/settings/': {
       id: '/dashboard/settings/'
       path: '/settings'
@@ -478,6 +497,7 @@ interface DashboardRouteChildren {
   DashboardQuotesIndexRoute: typeof DashboardQuotesIndexRoute
   DashboardReadingLogIndexRoute: typeof DashboardReadingLogIndexRoute
   DashboardRecommendationsIndexRoute: typeof DashboardRecommendationsIndexRoute
+  DashboardReviewsIndexRoute: typeof DashboardReviewsIndexRoute
   DashboardSettingsIndexRoute: typeof DashboardSettingsIndexRoute
   DashboardStatisticsIndexRoute: typeof DashboardStatisticsIndexRoute
 }
@@ -495,6 +515,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardQuotesIndexRoute: DashboardQuotesIndexRoute,
   DashboardReadingLogIndexRoute: DashboardReadingLogIndexRoute,
   DashboardRecommendationsIndexRoute: DashboardRecommendationsIndexRoute,
+  DashboardReviewsIndexRoute: DashboardReviewsIndexRoute,
   DashboardSettingsIndexRoute: DashboardSettingsIndexRoute,
   DashboardStatisticsIndexRoute: DashboardStatisticsIndexRoute,
 }

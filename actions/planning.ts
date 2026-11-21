@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { db } from "@/lib/db";
 import { BookInputError } from "@/lib/db/book-writes";
-import { getPlannerRange } from "@/lib/db/planning-reads";
+import { getPlannerRange, getWeekSummary, listWeeklyReviews } from "@/lib/db/planning-reads";
 import {
   addPlanItems,
   cancelPriority,
@@ -13,6 +13,7 @@ import {
   listPriorities,
   reopenPlanItem,
   reschedulePlanItem,
+  saveWeeklyReview,
   setPriority,
   skipPlanItem,
   updatePlanItem,
@@ -20,6 +21,7 @@ import {
   type CreatePlanInput,
   type PlanItemInput,
   type RepeatRule,
+  type SaveWeeklyReviewInput,
   type SetPriorityInput,
   type TimeOfDay,
   type UpdatePlanItemInput,
@@ -103,3 +105,16 @@ export const completePlanItemAction = createServerFn({ method: "POST" })
     const { itemId, ...input } = data;
     return wrap(() => completePlanItem(db, itemId, input));
   });
+
+// -------------------------------------------------------------- weekly review
+export const getWeekSummaryAction = createServerFn({ method: "GET" })
+  .validator((d: { weekStart: string }) => d)
+  .handler(({ data }) => wrap(() => getWeekSummary(db, data.weekStart)));
+
+export const getWeeklyReviewsAction = createServerFn({ method: "GET" })
+  .validator((d: { limit?: number } | undefined) => d ?? {})
+  .handler(({ data }) => wrap(() => listWeeklyReviews(db, data.limit)));
+
+export const saveWeeklyReviewAction = createServerFn({ method: "POST" })
+  .validator((d: SaveWeeklyReviewInput) => d)
+  .handler(({ data }) => wrap(() => saveWeeklyReview(db, data)));

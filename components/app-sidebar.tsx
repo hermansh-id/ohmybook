@@ -15,6 +15,7 @@ import {
   IconQuote,
   IconFlag3,
   IconCalendarEvent,
+  IconChecklist,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -66,6 +67,11 @@ const data = {
       title: "Planner",
       url: "/dashboard/planner",
       icon: IconCalendarEvent,
+    },
+    {
+      title: "Weekly Review",
+      url: "/dashboard/reviews",
+      icon: IconChecklist,
     },
     {
       title: "Recommendations",

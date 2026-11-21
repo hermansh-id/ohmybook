@@ -11,8 +11,11 @@ import {
   getPlannerRangeAction,
   getPrioritiesAction,
   getPriorityChangesAction,
+  getWeekSummaryAction,
+  getWeeklyReviewsAction,
   reopenPlanItemAction,
   reschedulePlanItemAction,
+  saveWeeklyReviewAction,
   setPriorityAction,
   skipPlanItemAction,
   updatePlanItemAction,
@@ -121,4 +124,27 @@ export const useDeletePlanItem = () =>
 export const useCompletePlanItem = () =>
   usePlanningMutation((vars: Vars<typeof completePlanItemAction>) => completePlanItemAction({ data: vars }), {
     success: (r) => (r.bookCompleted ? "Logged. You finished the book!" : "Reading logged"),
+  });
+
+// -------------------------------------------------------------- weekly review
+export function useWeekSummary(weekStart: string) {
+  return useQuery({
+    queryKey: ["weekly-review", "summary", weekStart],
+    queryFn: async () => unwrap(await getWeekSummaryAction({ data: { weekStart } })),
+    staleTime: 1000 * 30,
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useWeeklyReviews(limit = 12) {
+  return useQuery({
+    queryKey: ["weekly-review", "list", limit],
+    queryFn: async () => unwrap(await getWeeklyReviewsAction({ data: { limit } })),
+    staleTime: 1000 * 30,
+  });
+}
+
+export const useSaveWeeklyReview = () =>
+  usePlanningMutation((vars: Vars<typeof saveWeeklyReviewAction>) => saveWeeklyReviewAction({ data: vars }), {
+    success: "Review saved",
   });

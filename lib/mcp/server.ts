@@ -16,10 +16,11 @@ import {
   getPriorityChanges,
   listPriorities,
   reschedulePlanItem,
+  saveWeeklyReview,
   setPriority,
   skipPlanItem,
 } from "@/lib/db/planning-writes";
-import { getPlannerRange } from "@/lib/db/planning-reads";
+import { getPlannerRange, getWeekSummary } from "@/lib/db/planning-reads";
 import { addDays, todayInTimezone, weekStartKey } from "@/lib/dates";
 import {
   searchBooks,
@@ -796,6 +797,36 @@ export function createMcpServer() {
       annotations: DESTRUCTIVE,
     },
     async ({ itemId }) => run(async () => ({ success: true, removed: await deletePlanItem(db, itemId) })),
+  );
+
+  server.registerTool(
+    "get_weekly_review",
+    {
+      title: "Weekly reading review",
+      description:
+        "Summary of a week (Monday to Sunday): planned vs completed vs skipped activities, planned vs actual pages and completion %, total pages/time read, books finished, books in progress, priority changes, and the saved reflection if any. Default: the current week. An unfinished plan is information, not a failure.",
+      inputSchema: { weekStart: dateStr.optional().describe("Any date in the week") },
+      annotations: READ,
+    },
+    async ({ weekStart }) => run(() => getWeekSummary(db, weekStart ?? todayInTimezone())),
+  );
+
+  server.registerTool(
+    "save_weekly_review",
+    {
+      title: "Save weekly review reflection",
+      description:
+        "Save the reflection for a week (and snapshot its numbers). wentWell = what went well, blockers = what prevented following the plan, nextWeekChanges = what should change next week. Only provided fields change; empty string clears. Default week: current.",
+      inputSchema: {
+        weekStart: dateStr.optional(),
+        wentWell: z.string().optional(),
+        blockers: z.string().optional(),
+        nextWeekChanges: z.string().optional(),
+      },
+      annotations: IDEMPOTENT_WRITE,
+    },
+    async ({ weekStart, ...rest }) =>
+      run(async () => ({ success: true, review: await saveWeeklyReview(db, { weekStart: weekStart ?? todayInTimezone(), ...rest }) })),
   );
 
   return server;
