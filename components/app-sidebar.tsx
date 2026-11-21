@@ -13,6 +13,7 @@ import {
   IconCategory,
   IconBulb,
   IconQuote,
+  IconFlag3,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -55,6 +56,11 @@ const data = {
     },
   ],
   activityNav: [
+    {
+      title: "Priorities",
+      url: "/dashboard/priorities",
+      icon: IconFlag3,
+    },
     {
       title: "Recommendations",
       url: "/dashboard/recommendations",

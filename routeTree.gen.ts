@@ -24,6 +24,7 @@ import { Route as DashboardBooksBookIdRouteImport } from './app/dashboard/books/
 import { Route as DashboardBooksAddRouteImport } from './app/dashboard/books/add'
 import { Route as DashboardCalendarIndexRouteImport } from './app/dashboard/calendar/index'
 import { Route as DashboardGenresIndexRouteImport } from './app/dashboard/genres/index'
+import { Route as DashboardPrioritiesIndexRouteImport } from './app/dashboard/priorities/index'
 import { Route as DashboardQuotesIndexRouteImport } from './app/dashboard/quotes/index'
 import { Route as DashboardReadingLogIndexRouteImport } from './app/dashboard/reading-log/index'
 import { Route as DashboardRecommendationsIndexRouteImport } from './app/dashboard/recommendations/index'
@@ -107,6 +108,12 @@ const DashboardGenresIndexRoute = DashboardGenresIndexRouteImport.update({
   path: '/genres/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardPrioritiesIndexRoute =
+  DashboardPrioritiesIndexRouteImport.update({
+    id: '/priorities/',
+    path: '/priorities/',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardQuotesIndexRoute = DashboardQuotesIndexRouteImport.update({
   id: '/quotes/',
   path: '/quotes/',
@@ -152,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/books/': typeof DashboardBooksIndexRoute
   '/dashboard/calendar/': typeof DashboardCalendarIndexRoute
   '/dashboard/genres/': typeof DashboardGenresIndexRoute
+  '/dashboard/priorities/': typeof DashboardPrioritiesIndexRoute
   '/dashboard/quotes/': typeof DashboardQuotesIndexRoute
   '/dashboard/reading-log/': typeof DashboardReadingLogIndexRoute
   '/dashboard/recommendations/': typeof DashboardRecommendationsIndexRoute
@@ -173,6 +181,7 @@ export interface FileRoutesByTo {
   '/dashboard/books': typeof DashboardBooksIndexRoute
   '/dashboard/calendar': typeof DashboardCalendarIndexRoute
   '/dashboard/genres': typeof DashboardGenresIndexRoute
+  '/dashboard/priorities': typeof DashboardPrioritiesIndexRoute
   '/dashboard/quotes': typeof DashboardQuotesIndexRoute
   '/dashboard/reading-log': typeof DashboardReadingLogIndexRoute
   '/dashboard/recommendations': typeof DashboardRecommendationsIndexRoute
@@ -196,6 +205,7 @@ export interface FileRoutesById {
   '/dashboard/books/': typeof DashboardBooksIndexRoute
   '/dashboard/calendar/': typeof DashboardCalendarIndexRoute
   '/dashboard/genres/': typeof DashboardGenresIndexRoute
+  '/dashboard/priorities/': typeof DashboardPrioritiesIndexRoute
   '/dashboard/quotes/': typeof DashboardQuotesIndexRoute
   '/dashboard/reading-log/': typeof DashboardReadingLogIndexRoute
   '/dashboard/recommendations/': typeof DashboardRecommendationsIndexRoute
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/dashboard/books/'
     | '/dashboard/calendar/'
     | '/dashboard/genres/'
+    | '/dashboard/priorities/'
     | '/dashboard/quotes/'
     | '/dashboard/reading-log/'
     | '/dashboard/recommendations/'
@@ -241,6 +252,7 @@ export interface FileRouteTypes {
     | '/dashboard/books'
     | '/dashboard/calendar'
     | '/dashboard/genres'
+    | '/dashboard/priorities'
     | '/dashboard/quotes'
     | '/dashboard/reading-log'
     | '/dashboard/recommendations'
@@ -263,6 +275,7 @@ export interface FileRouteTypes {
     | '/dashboard/books/'
     | '/dashboard/calendar/'
     | '/dashboard/genres/'
+    | '/dashboard/priorities/'
     | '/dashboard/quotes/'
     | '/dashboard/reading-log/'
     | '/dashboard/recommendations/'
@@ -388,6 +401,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardGenresIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/priorities/': {
+      id: '/dashboard/priorities/'
+      path: '/priorities'
+      fullPath: '/dashboard/priorities/'
+      preLoaderRoute: typeof DashboardPrioritiesIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/quotes/': {
       id: '/dashboard/quotes/'
       path: '/quotes'
@@ -434,6 +454,7 @@ interface DashboardRouteChildren {
   DashboardBooksIndexRoute: typeof DashboardBooksIndexRoute
   DashboardCalendarIndexRoute: typeof DashboardCalendarIndexRoute
   DashboardGenresIndexRoute: typeof DashboardGenresIndexRoute
+  DashboardPrioritiesIndexRoute: typeof DashboardPrioritiesIndexRoute
   DashboardQuotesIndexRoute: typeof DashboardQuotesIndexRoute
   DashboardReadingLogIndexRoute: typeof DashboardReadingLogIndexRoute
   DashboardRecommendationsIndexRoute: typeof DashboardRecommendationsIndexRoute
@@ -449,6 +470,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardBooksIndexRoute: DashboardBooksIndexRoute,
   DashboardCalendarIndexRoute: DashboardCalendarIndexRoute,
   DashboardGenresIndexRoute: DashboardGenresIndexRoute,
+  DashboardPrioritiesIndexRoute: DashboardPrioritiesIndexRoute,
   DashboardQuotesIndexRoute: DashboardQuotesIndexRoute,
   DashboardReadingLogIndexRoute: DashboardReadingLogIndexRoute,
   DashboardRecommendationsIndexRoute: DashboardRecommendationsIndexRoute,

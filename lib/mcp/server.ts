@@ -5,6 +5,13 @@ import { BookInputError, attachAuthorsGenres } from "@/lib/db/book-writes";
 import { addAuthor, addGenre, deleteBook, updateBookDetails } from "@/lib/db/library-writes";
 import { READING_STATUSES, updateBookReading } from "@/lib/db/reading-writes";
 import {
+  PRIORITY_LEVELS,
+  closePriority,
+  getPriorityChanges,
+  listPriorities,
+  setPriority,
+} from "@/lib/db/planning-writes";
+import {
   searchBooks,
   getBookById,
   getCurrentlyReadingBooks,
@@ -593,6 +600,52 @@ export function createMcpServer() {
       annotations: DESTRUCTIVE,
     },
     async ({ bookId }) => run(async () => ({ success: true, deleted: await deleteBook(db, bookId) })),
+  );
+
+  // ============================================================ planning
+  server.registerTool(
+    "list_reading_priorities",
+    {
+      title: "List reading priorities",
+      description:
+        "Reading priorities (critical > high > medium > low) with reason, target date, estimate, reading status and progress. A priority is separate from reading status. Default: active ones.",
+      inputSchema: { status: z.enum(["active", "completed", "cancelled", "all"]).optional() },
+      annotations: READ,
+    },
+    async ({ status }) =>
+      json({
+        priorities: await listPriorities(db, { status: status ?? "active" }),
+        recentChanges: await getPriorityChanges(db, { limit: 10 }),
+      }),
+  );
+
+  server.registerTool(
+    "set_book_priority",
+    {
+      title: "Set book priority",
+      description:
+        "Create or update a book's active priority (one per book). Only provided fields change; empty string/null clears reason, targetDate or estimatedMinutes. Never changes the book's reading status. Only call when the user asks to change a priority.",
+      inputSchema: {
+        bookId: z.number().int(),
+        level: z.enum(PRIORITY_LEVELS).optional().describe("Default medium for a new priority"),
+        reason: z.string().nullable().optional(),
+        targetDate: dateStr.nullable().optional(),
+        estimatedMinutes: z.number().int().min(1).nullable().optional(),
+      },
+      annotations: IDEMPOTENT_WRITE,
+    },
+    async (input) => run(async () => ({ success: true, priority: await setPriority(db, input) })),
+  );
+
+  server.registerTool(
+    "close_book_priority",
+    {
+      title: "Complete or cancel a priority",
+      description: "Close a book's active priority as 'completed' or 'cancelled'. Only when the user asks.",
+      inputSchema: { bookId: z.number().int(), outcome: z.enum(["completed", "cancelled"]) },
+      annotations: IDEMPOTENT_WRITE,
+    },
+    async ({ bookId, outcome }) => run(async () => ({ success: true, priority: await closePriority(db, bookId, outcome) })),
   );
 
   return server;

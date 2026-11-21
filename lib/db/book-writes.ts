@@ -149,7 +149,7 @@ function linkGenres(d: AnyDb, bookIdExpr: ReturnType<typeof sql>, items: Item[],
  * neon-http has no interactive transactions, but batch() is one transaction.
  * Returns the results array.
  */
-async function runAtomic(database: AnyDb, build: (d: AnyDb) => unknown[]): Promise<unknown[]> {
+export async function runAtomic(database: AnyDb, build: (d: AnyDb) => unknown[]): Promise<unknown[]> {
   if (typeof database.batch === "function") {
     return database.batch(build(database));
   }
