@@ -18,7 +18,14 @@ import {
   getAllGenresWithBookCount,
   getReadingStreaks,
 } from "@/lib/db/queries";
-import { addBook } from "@/lib/server/books";
+import {
+  addBook,
+  lookupIsbn,
+  lookupQrcbn,
+  lookupGoodreadsUrl,
+  getReadingRecommendations,
+  refreshGoodreadsData,
+} from "@/lib/server/books";
 
 function json(data: unknown) {
   return {
@@ -27,6 +34,7 @@ function json(data: unknown) {
 }
 
 const READ = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+const EXTERNAL_READ = { readOnlyHint: true, destructiveHint: false, openWorldHint: true };
 const WRITE = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
 
 export function createMcpServer() {
@@ -130,7 +138,61 @@ export function createMcpServer() {
       }),
   );
 
+  server.registerTool(
+    "get_reading_recommendations",
+    {
+      title: "Reading recommendations",
+      description:
+        "Top 10 unread/in-progress books from the library, ranked by Goodreads rating, popularity, length and time in library.",
+      inputSchema: {},
+      annotations: READ,
+    },
+    async () => json(await getReadingRecommendations()),
+  );
+
+  server.registerTool(
+    "lookup_book",
+    {
+      title: "Look up book (Goodreads)",
+      description:
+        "Look up book metadata (title, authors, year, pages, cover, description, Goodreads URL) from Goodreads. Provide exactly ONE of: isbn, qrcbn, goodreadsUrl. Does not write to the library; pass the result to add_book. May fail if Goodreads blocks the request: then retry or ask the user for the details.",
+      inputSchema: {
+        isbn: z.string().optional().describe("ISBN-10 or ISBN-13"),
+        qrcbn: z.string().optional().describe("Raw QRCBN code"),
+        goodreadsUrl: z.string().url().optional().describe("goodreads.com book URL"),
+      },
+      annotations: EXTERNAL_READ,
+    },
+    async ({ isbn, qrcbn, goodreadsUrl }) => {
+      const given = [isbn, qrcbn, goodreadsUrl].filter(Boolean);
+      if (given.length !== 1) {
+        return { isError: true, ...json({ success: false, error: "Provide exactly one of isbn, qrcbn, goodreadsUrl" }) };
+      }
+      const result = isbn
+        ? await lookupIsbn(isbn)
+        : qrcbn
+          ? await lookupQrcbn(qrcbn)
+          : await lookupGoodreadsUrl(goodreadsUrl!);
+      return { ...(result.success ? {} : { isError: true }), ...json(result) };
+    },
+  );
+
   // --------------------------------------------------------------- write
+  server.registerTool(
+    "refresh_goodreads_data",
+    {
+      title: "Refresh Goodreads data",
+      description:
+        "Fetch cover, description and Goodreads URL from Goodreads for an existing book and save them. Uses the book's Goodreads URL, or its ISBN if there is none.",
+      inputSchema: { bookId: z.number().int() },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ bookId }) => {
+      const result = await refreshGoodreadsData(bookId);
+      return { ...(result.success ? {} : { isError: true }), ...json(result) };
+    },
+  );
+
   server.registerTool(
     "add_book",
     {

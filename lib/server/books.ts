@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { books } from "@/lib/db/schema";
+import { getAllBooksWithDetails } from "@/lib/db/queries";
+import { books, goodreadsData } from "@/lib/db/schema";
 import { eq, or, sql } from "drizzle-orm";
 import * as cheerio from "cheerio";
 import { BookInputError, createBookWithAuthors } from "@/lib/db/book-writes";
@@ -469,3 +470,152 @@ export async function lookupGoodreadsUrl(url: string): Promise<BookLookupResult>
     }
 }
 
+
+export async function getReadingRecommendations() {
+  try {
+    const allBooks = await getAllBooksWithDetails();
+
+    // Group by book and aggregate data
+    const bookMap = new Map();
+
+    allBooks.forEach((row) => {
+      const bookId = row.book.bookId;
+
+      if (!bookMap.has(bookId)) {
+        bookMap.set(bookId, {
+          id: bookId,
+          title: row.book.title,
+          isbn: row.book.isbn,
+          year: row.book.year,
+          pages: row.book.pages,
+          addedAt: row.book.addedAt,
+          authors: [],
+          genres: [],
+          status: row.readingStatus?.status || "not_started",
+          rating: row.readingStatus?.rating || null,
+          coverUrl: row.goodreads?.coverUrl || null,
+          averageRating: row.goodreads?.averageRating || null,
+          ratingsCount: row.goodreads?.ratingsCount || null,
+          description: row.goodreads?.description || null,
+        });
+      }
+
+      const book = bookMap.get(bookId);
+
+      if (row.author && !book.authors.some((a: any) => a.name === row.author?.name)) {
+        book.authors.push({
+          id: row.author.authorId,
+          name: row.author.name,
+        });
+      }
+
+      if (row.genre && !book.genres.some((g: any) => g.name === row.genre?.genreName)) {
+        book.genres.push({
+          id: row.genre.genreId,
+          name: row.genre.genreName,
+        });
+      }
+    });
+
+    const booksArray = Array.from(bookMap.values());
+
+    // Filter unread books (not_started or reading)
+    const unreadBooks = booksArray.filter(
+      (book) => book.status === "not_started" || book.status === "reading"
+    );
+
+    // Calculate recommendation scores
+    const recommendations = unreadBooks.map((book) => {
+      let score = 0;
+
+      // Prioritize books currently reading
+      if (book.status === "reading") score += 100;
+
+      // Higher Goodreads rating = higher score
+      if (book.averageRating) {
+        score += parseFloat(book.averageRating.toString()) * 10;
+      }
+
+      // More ratings = more popular = higher score
+      if (book.ratingsCount) {
+        score += Math.min(book.ratingsCount / 100, 20); // Cap at 20 points
+      }
+
+      // Shorter books get slightly higher score (easier to finish)
+      if (book.pages) {
+        score += Math.max(0, (500 - book.pages) / 100);
+      }
+
+      // Older books in library (should read soon)
+      if (book.addedAt) {
+        const daysInLibrary = (Date.now() - new Date(book.addedAt).getTime()) / (1000 * 60 * 60 * 24);
+        score += Math.min(daysInLibrary / 10, 15); // Cap at 15 points
+      }
+
+      return { ...book, recommendationScore: score };
+    });
+
+    // Sort by recommendation score
+    recommendations.sort((a, b) => b.recommendationScore - a.recommendationScore);
+
+    // Return top 10 recommendations
+    return recommendations.slice(0, 10);
+  } catch (error) {
+    console.error("Error getting recommendations:", error);
+    return [];
+  }
+}
+
+/**
+ * Fetch Goodreads data (cover, description, URL) for an existing book and save it.
+ * Lookup order: explicit isbn option -> book's goodreadsUrl -> book's isbn.
+ */
+export async function refreshGoodreadsData(bookId: number, opts: { isbn?: string } = {}) {
+  try {
+    const [book] = await db.select().from(books).where(eq(books.bookId, bookId)).limit(1);
+    if (!book) return { success: false, error: `Book ${bookId} not found` };
+
+    let result: BookLookupResult;
+    if (opts.isbn) result = await lookupIsbn(opts.isbn);
+    else if (book.goodreadsUrl) result = await lookupGoodreadsUrl(book.goodreadsUrl);
+    else if (book.isbn) result = await lookupIsbn(book.isbn);
+    else return { success: false, error: "Book has no ISBN or Goodreads URL to look up" };
+
+    if (!result.success || !result.data) {
+      return { success: false, error: result.error || "Failed to fetch Goodreads data" };
+    }
+
+    const values = {
+      coverUrl: result.data.coverUrl || null,
+      description: result.data.description || null,
+      lastUpdated: new Date(),
+    };
+
+    const [existing] = await db
+      .select({ bookId: goodreadsData.bookId })
+      .from(goodreadsData)
+      .where(eq(goodreadsData.bookId, bookId))
+      .limit(1);
+
+    if (existing) {
+      await db.update(goodreadsData).set(values).where(eq(goodreadsData.bookId, bookId));
+    } else {
+      await db.insert(goodreadsData).values({ bookId, ...values });
+    }
+
+    if (result.data.goodreadsUrl) {
+      await db.update(books).set({ goodreadsUrl: result.data.goodreadsUrl }).where(eq(books.bookId, bookId));
+    }
+
+    return {
+      success: true,
+      bookId,
+      coverUrl: values.coverUrl,
+      description: values.description,
+      goodreadsUrl: result.data.goodreadsUrl ?? book.goodreadsUrl,
+    };
+  } catch (error) {
+    console.error("Error fetching Goodreads data:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch Goodreads data" };
+  }
+}
