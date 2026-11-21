@@ -18,7 +18,7 @@ import {
   getAllGenresWithBookCount,
   getReadingStreaks,
 } from "@/lib/db/queries";
-import { addBook } from "@/actions/books";
+import { addBook } from "@/lib/server/books";
 
 function json(data: unknown) {
   return {
@@ -136,14 +136,16 @@ export function createMcpServer() {
     {
       title: "Add book",
       description:
-        "Add a book to the library. Rejects duplicates (same ISBN or same title). Use list_authors_and_genres for IDs.",
+        "Add a book to the library. Pass author NAMES in 'authors': existing authors are reused (case-insensitive), missing ones are created automatically, no ID lookup needed. 'authorIds' is still accepted for existing authors. Rejects duplicates (same ISBN or same title). Returns the created book with its authors.",
       inputSchema: {
         title: z.string().min(1),
-        authorIds: z.array(z.number().int()),
+        authors: z.array(z.string().min(1)).optional().describe("Author names, e.g. ['Aria Wiratma Yudhistira']"),
+        authorIds: z.array(z.number().int()).optional().describe("IDs of existing authors"),
         genreIds: z.array(z.number().int()).optional(),
         isbn: z.string().optional(),
         year: z.number().int().optional(),
         pages: z.number().int().positive().optional(),
+        publisher: z.string().optional(),
         goodreadsUrl: z.string().url().optional(),
         coverUrl: z.string().url().optional(),
         description: z.string().optional(),

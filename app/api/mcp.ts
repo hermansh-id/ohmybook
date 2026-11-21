@@ -22,7 +22,9 @@ async function isAllowedUser(userId: string | null | undefined) {
   return !!user && allowed.includes(user.email.toLowerCase());
 }
 
-const handle = withMcpAuth(auth, async (req, session) => {
+// NOTE: keep everything server-only inside the handlers. Module-level code that
+// touches `auth`/`db` is NOT stripped from the client bundle by TanStack Start.
+const handle = (request: Request) => withMcpAuth(auth, async (req, session) => {
   if (!(await isAllowedUser(session.userId))) {
     return Response.json(
       { jsonrpc: "2.0", error: { code: -32001, message: "Forbidden" }, id: null },
@@ -38,7 +40,7 @@ const handle = withMcpAuth(auth, async (req, session) => {
   const server = createMcpServer();
   await server.connect(transport);
   return transport.handleRequest(req);
-});
+})(request);
 
 export const Route = createFileRoute("/api/mcp")({
   server: {

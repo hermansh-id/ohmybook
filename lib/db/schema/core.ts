@@ -9,6 +9,7 @@ import {
   date,
   check,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -23,6 +24,8 @@ export const authors = pgTable(
   },
   (table) => ({
     nameIdx: index("idx_authors_name").on(table.name),
+    // Case-insensitive uniqueness: "aria x" and "Aria X" are the same author
+    nameLowerUnique: uniqueIndex("uq_authors_name_lower").on(sql`lower(${table.name})`),
   })
 );
 
