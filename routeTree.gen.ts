@@ -9,30 +9,30 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './app/__root'
-import { Route as LoginRouteImport } from './app/login'
-import { Route as DashboardRouteImport } from './app/dashboard'
 import { Route as IndexRouteImport } from './app/index'
-import { Route as DashboardIndexRouteImport } from './app/dashboard/index'
-import { Route as ApiMcpRouteImport } from './app/api/mcp'
-import { Route as DotwellKnownOauthProtectedResourceRouteImport } from './app/[.]well-known.oauth-protected-resource'
+import { Route as DashboardRouteImport } from './app/dashboard'
+import { Route as LoginRouteImport } from './app/login'
 import { Route as DotwellKnownOauthAuthorizationServerRouteImport } from './app/[.]well-known.oauth-authorization-server'
-import { Route as DashboardStatisticsIndexRouteImport } from './app/dashboard/statistics/index'
-import { Route as DashboardSettingsIndexRouteImport } from './app/dashboard/settings/index'
-import { Route as DashboardRecommendationsIndexRouteImport } from './app/dashboard/recommendations/index'
-import { Route as DashboardReadingLogIndexRouteImport } from './app/dashboard/reading-log/index'
-import { Route as DashboardQuotesIndexRouteImport } from './app/dashboard/quotes/index'
-import { Route as DashboardGenresIndexRouteImport } from './app/dashboard/genres/index'
-import { Route as DashboardCalendarIndexRouteImport } from './app/dashboard/calendar/index'
-import { Route as DashboardBooksIndexRouteImport } from './app/dashboard/books/index'
-import { Route as DashboardAuthorsIndexRouteImport } from './app/dashboard/authors/index'
-import { Route as DashboardBooksAddRouteImport } from './app/dashboard/books/add'
-import { Route as DashboardBooksBookIdRouteImport } from './app/dashboard/books/$bookId'
-import { Route as ApiStatsMarkdownRouteImport } from './app/api/stats/markdown'
+import { Route as DotwellKnownOauthProtectedResourceRouteImport } from './app/[.]well-known.oauth-protected-resource'
+import { Route as ApiMcpRouteImport } from './app/api/mcp'
+import { Route as DashboardIndexRouteImport } from './app/dashboard/index'
 import { Route as ApiAuthSplatRouteImport } from './app/api/auth/$'
+import { Route as ApiStatsMarkdownRouteImport } from './app/api/stats/markdown'
+import { Route as DashboardAuthorsIndexRouteImport } from './app/dashboard/authors/index'
+import { Route as DashboardBooksIndexRouteImport } from './app/dashboard/books/index'
+import { Route as DashboardBooksBookIdRouteImport } from './app/dashboard/books/$bookId'
+import { Route as DashboardBooksAddRouteImport } from './app/dashboard/books/add'
+import { Route as DashboardCalendarIndexRouteImport } from './app/dashboard/calendar/index'
+import { Route as DashboardGenresIndexRouteImport } from './app/dashboard/genres/index'
+import { Route as DashboardQuotesIndexRouteImport } from './app/dashboard/quotes/index'
+import { Route as DashboardReadingLogIndexRouteImport } from './app/dashboard/reading-log/index'
+import { Route as DashboardRecommendationsIndexRouteImport } from './app/dashboard/recommendations/index'
+import { Route as DashboardSettingsIndexRouteImport } from './app/dashboard/settings/index'
+import { Route as DashboardStatisticsIndexRouteImport } from './app/dashboard/statistics/index'
 
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -40,9 +40,26 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DotwellKnownOauthAuthorizationServerRoute =
+  DotwellKnownOauthAuthorizationServerRouteImport.update({
+    id: '/.well-known/oauth-authorization-server',
+    path: '/.well-known/oauth-authorization-server',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DotwellKnownOauthProtectedResourceRoute =
+  DotwellKnownOauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiMcpRoute = ApiMcpRouteImport.update({
+  id: '/api/mcp',
+  path: '/api/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardIndexRoute = DashboardIndexRouteImport.update({
@@ -50,59 +67,19 @@ const DashboardIndexRoute = DashboardIndexRouteImport.update({
   path: '/',
   getParentRoute: () => DashboardRoute,
 } as any)
-const ApiMcpRoute = ApiMcpRouteImport.update({
-  id: '/api/mcp',
-  path: '/api/mcp',
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DotwellKnownOauthProtectedResourceRoute =
-  DotwellKnownOauthProtectedResourceRouteImport.update({
-    id: '/.well-known/oauth-protected-resource',
-    path: '/.well-known/oauth-protected-resource',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const DotwellKnownOauthAuthorizationServerRoute =
-  DotwellKnownOauthAuthorizationServerRouteImport.update({
-    id: '/.well-known/oauth-authorization-server',
-    path: '/.well-known/oauth-authorization-server',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const DashboardStatisticsIndexRoute =
-  DashboardStatisticsIndexRouteImport.update({
-    id: '/statistics/',
-    path: '/statistics/',
-    getParentRoute: () => DashboardRoute,
-  } as any)
-const DashboardSettingsIndexRoute = DashboardSettingsIndexRouteImport.update({
-  id: '/settings/',
-  path: '/settings/',
-  getParentRoute: () => DashboardRoute,
+const ApiStatsMarkdownRoute = ApiStatsMarkdownRouteImport.update({
+  id: '/api/stats/markdown',
+  path: '/api/stats/markdown',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardRecommendationsIndexRoute =
-  DashboardRecommendationsIndexRouteImport.update({
-    id: '/recommendations/',
-    path: '/recommendations/',
-    getParentRoute: () => DashboardRoute,
-  } as any)
-const DashboardReadingLogIndexRoute =
-  DashboardReadingLogIndexRouteImport.update({
-    id: '/reading-log/',
-    path: '/reading-log/',
-    getParentRoute: () => DashboardRoute,
-  } as any)
-const DashboardQuotesIndexRoute = DashboardQuotesIndexRouteImport.update({
-  id: '/quotes/',
-  path: '/quotes/',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardGenresIndexRoute = DashboardGenresIndexRouteImport.update({
-  id: '/genres/',
-  path: '/genres/',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardCalendarIndexRoute = DashboardCalendarIndexRouteImport.update({
-  id: '/calendar/',
-  path: '/calendar/',
+const DashboardAuthorsIndexRoute = DashboardAuthorsIndexRouteImport.update({
+  id: '/authors/',
+  path: '/authors/',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardBooksIndexRoute = DashboardBooksIndexRouteImport.update({
@@ -110,9 +87,9 @@ const DashboardBooksIndexRoute = DashboardBooksIndexRouteImport.update({
   path: '/books/',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardAuthorsIndexRoute = DashboardAuthorsIndexRouteImport.update({
-  id: '/authors/',
-  path: '/authors/',
+const DashboardBooksBookIdRoute = DashboardBooksBookIdRouteImport.update({
+  id: '/books/$bookId',
+  path: '/books/$bookId',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardBooksAddRoute = DashboardBooksAddRouteImport.update({
@@ -120,21 +97,44 @@ const DashboardBooksAddRoute = DashboardBooksAddRouteImport.update({
   path: '/books/add',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardBooksBookIdRoute = DashboardBooksBookIdRouteImport.update({
-  id: '/books/$bookId',
-  path: '/books/$bookId',
+const DashboardCalendarIndexRoute = DashboardCalendarIndexRouteImport.update({
+  id: '/calendar/',
+  path: '/calendar/',
   getParentRoute: () => DashboardRoute,
 } as any)
-const ApiStatsMarkdownRoute = ApiStatsMarkdownRouteImport.update({
-  id: '/api/stats/markdown',
-  path: '/api/stats/markdown',
-  getParentRoute: () => rootRouteImport,
+const DashboardGenresIndexRoute = DashboardGenresIndexRouteImport.update({
+  id: '/genres/',
+  path: '/genres/',
+  getParentRoute: () => DashboardRoute,
 } as any)
-const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
-  getParentRoute: () => rootRouteImport,
+const DashboardQuotesIndexRoute = DashboardQuotesIndexRouteImport.update({
+  id: '/quotes/',
+  path: '/quotes/',
+  getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardReadingLogIndexRoute =
+  DashboardReadingLogIndexRouteImport.update({
+    id: '/reading-log/',
+    path: '/reading-log/',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardRecommendationsIndexRoute =
+  DashboardRecommendationsIndexRouteImport.update({
+    id: '/recommendations/',
+    path: '/recommendations/',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardSettingsIndexRoute = DashboardSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardStatisticsIndexRoute =
+  DashboardStatisticsIndexRouteImport.update({
+    id: '/statistics/',
+    path: '/statistics/',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -283,11 +283,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -297,32 +297,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard/': {
-      id: '/dashboard/'
-      path: '/'
-      fullPath: '/dashboard/'
-      preLoaderRoute: typeof DashboardIndexRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/api/mcp': {
-      id: '/api/mcp'
-      path: '/api/mcp'
-      fullPath: '/api/mcp'
-      preLoaderRoute: typeof ApiMcpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/.well-known/oauth-protected-resource': {
-      id: '/.well-known/oauth-protected-resource'
-      path: '/.well-known/oauth-protected-resource'
-      fullPath: '/.well-known/oauth-protected-resource'
-      preLoaderRoute: typeof DotwellKnownOauthProtectedResourceRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.well-known/oauth-authorization-server': {
@@ -332,53 +311,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotwellKnownOauthAuthorizationServerRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/dashboard/statistics/': {
-      id: '/dashboard/statistics/'
-      path: '/statistics'
-      fullPath: '/dashboard/statistics/'
-      preLoaderRoute: typeof DashboardStatisticsIndexRouteImport
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof DotwellKnownOauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mcp': {
+      id: '/api/mcp'
+      path: '/api/mcp'
+      fullPath: '/api/mcp'
+      preLoaderRoute: typeof ApiMcpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard/': {
+      id: '/dashboard/'
+      path: '/'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof DashboardIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/settings/': {
-      id: '/dashboard/settings/'
-      path: '/settings'
-      fullPath: '/dashboard/settings/'
-      preLoaderRoute: typeof DashboardSettingsIndexRouteImport
-      parentRoute: typeof DashboardRoute
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/dashboard/recommendations/': {
-      id: '/dashboard/recommendations/'
-      path: '/recommendations'
-      fullPath: '/dashboard/recommendations/'
-      preLoaderRoute: typeof DashboardRecommendationsIndexRouteImport
-      parentRoute: typeof DashboardRoute
+    '/api/stats/markdown': {
+      id: '/api/stats/markdown'
+      path: '/api/stats/markdown'
+      fullPath: '/api/stats/markdown'
+      preLoaderRoute: typeof ApiStatsMarkdownRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/dashboard/reading-log/': {
-      id: '/dashboard/reading-log/'
-      path: '/reading-log'
-      fullPath: '/dashboard/reading-log/'
-      preLoaderRoute: typeof DashboardReadingLogIndexRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/quotes/': {
-      id: '/dashboard/quotes/'
-      path: '/quotes'
-      fullPath: '/dashboard/quotes/'
-      preLoaderRoute: typeof DashboardQuotesIndexRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/genres/': {
-      id: '/dashboard/genres/'
-      path: '/genres'
-      fullPath: '/dashboard/genres/'
-      preLoaderRoute: typeof DashboardGenresIndexRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/calendar/': {
-      id: '/dashboard/calendar/'
-      path: '/calendar'
-      fullPath: '/dashboard/calendar/'
-      preLoaderRoute: typeof DashboardCalendarIndexRouteImport
+    '/dashboard/authors/': {
+      id: '/dashboard/authors/'
+      path: '/authors'
+      fullPath: '/dashboard/authors/'
+      preLoaderRoute: typeof DashboardAuthorsIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/books/': {
@@ -388,11 +360,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardBooksIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/authors/': {
-      id: '/dashboard/authors/'
-      path: '/authors'
-      fullPath: '/dashboard/authors/'
-      preLoaderRoute: typeof DashboardAuthorsIndexRouteImport
+    '/dashboard/books/$bookId': {
+      id: '/dashboard/books/$bookId'
+      path: '/books/$bookId'
+      fullPath: '/dashboard/books/$bookId'
+      preLoaderRoute: typeof DashboardBooksBookIdRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/books/add': {
@@ -402,26 +374,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardBooksAddRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/books/$bookId': {
-      id: '/dashboard/books/$bookId'
-      path: '/books/$bookId'
-      fullPath: '/dashboard/books/$bookId'
-      preLoaderRoute: typeof DashboardBooksBookIdRouteImport
+    '/dashboard/calendar/': {
+      id: '/dashboard/calendar/'
+      path: '/calendar'
+      fullPath: '/dashboard/calendar/'
+      preLoaderRoute: typeof DashboardCalendarIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/api/stats/markdown': {
-      id: '/api/stats/markdown'
-      path: '/api/stats/markdown'
-      fullPath: '/api/stats/markdown'
-      preLoaderRoute: typeof ApiStatsMarkdownRouteImport
-      parentRoute: typeof rootRouteImport
+    '/dashboard/genres/': {
+      id: '/dashboard/genres/'
+      path: '/genres'
+      fullPath: '/dashboard/genres/'
+      preLoaderRoute: typeof DashboardGenresIndexRouteImport
+      parentRoute: typeof DashboardRoute
     }
-    '/api/auth/$': {
-      id: '/api/auth/$'
-      path: '/api/auth/$'
-      fullPath: '/api/auth/$'
-      preLoaderRoute: typeof ApiAuthSplatRouteImport
-      parentRoute: typeof rootRouteImport
+    '/dashboard/quotes/': {
+      id: '/dashboard/quotes/'
+      path: '/quotes'
+      fullPath: '/dashboard/quotes/'
+      preLoaderRoute: typeof DashboardQuotesIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/reading-log/': {
+      id: '/dashboard/reading-log/'
+      path: '/reading-log'
+      fullPath: '/dashboard/reading-log/'
+      preLoaderRoute: typeof DashboardReadingLogIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/recommendations/': {
+      id: '/dashboard/recommendations/'
+      path: '/recommendations'
+      fullPath: '/dashboard/recommendations/'
+      preLoaderRoute: typeof DashboardRecommendationsIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/settings/': {
+      id: '/dashboard/settings/'
+      path: '/settings'
+      fullPath: '/dashboard/settings/'
+      preLoaderRoute: typeof DashboardSettingsIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/statistics/': {
+      id: '/dashboard/statistics/'
+      path: '/statistics'
+      fullPath: '/dashboard/statistics/'
+      preLoaderRoute: typeof DashboardStatisticsIndexRouteImport
+      parentRoute: typeof DashboardRoute
     }
   }
 }
