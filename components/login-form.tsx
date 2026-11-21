@@ -56,7 +56,9 @@ export function LoginForm({
       await signIn.email(
         { email, password },
         {
-          onSuccess: async () => {
+          onSuccess: async (ctx) => {
+            // OAuth (MCP) flow: Better Auth returns a redirect back to /authorize
+            if (ctx.data?.redirect) return;
             toast.success("Signed in successfully!");
             await router.invalidate();
             navigate({ to: "/dashboard" });
