@@ -9,6 +9,7 @@ import { ReadingHistoryChart } from "@/components/reading-history-chart";
 import { ReadingHeatmap } from "@/components/reading-heatmap";
 import { AddReadingSessionDialog } from "@/components/add-reading-session-dialog";
 import { MonthlyRecapButton } from "@/components/dashboard-client";
+import { ReadingFocus } from "@/components/reading-focus";
 import {
   BookOpen,
   Target,
@@ -119,6 +120,9 @@ function DashboardPage() {
           />
         </div>
       </div>
+
+      {/* Reading focus: priorities, today's plan, weekend, weekly progress */}
+      <ReadingFocus />
 
       {/* Reading Goal Progress - Prominent */}
       <Card className="border-2">

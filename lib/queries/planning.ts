@@ -12,6 +12,7 @@ import {
   dismissRecommendationAction,
   getPlannerRangeAction,
   getPrioritiesAction,
+  getReadingFocusAction,
   getPriorityChangesAction,
   getWeekSummaryAction,
   getWeeklyReviewsAction,
@@ -168,3 +169,13 @@ export const usePostponeRecommendation = () =>
   usePlanningMutation((vars: Vars<typeof postponeRecommendationAction>) => postponeRecommendationAction({ data: vars }));
 export const useRestoreRecommendation = () =>
   usePlanningMutation((vars: Vars<typeof restoreRecommendationAction>) => restoreRecommendationAction({ data: vars }));
+
+// ------------------------------------------------------------- reading focus
+export function useReadingFocus(today: string) {
+  return useQuery({
+    queryKey: ["reading-focus", today],
+    queryFn: async () => unwrap(await getReadingFocusAction({ data: { today } })),
+    staleTime: 1000 * 60,
+    retry: 1,
+  });
+}

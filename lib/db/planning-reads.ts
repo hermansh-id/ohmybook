@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
-import { addDays, isDateKey, weekStartKey } from "@/lib/dates";
+import { addDays, daysBetween, isDateKey, weekStartKey } from "@/lib/dates";
 import { BookInputError } from "./book-writes";
 import {
   books,
@@ -128,6 +128,46 @@ export async function getPlannerRange(database: AnyDb, from: string, to: string)
     .orderBy(asc(readingLog.dateFinished));
 
   return { from, to, items, sessions, targets, finished } as PlannerRange;
+}
+
+// ============================================================================
+// PRIORITIES
+// ============================================================================
+
+const LEVEL_RANK = sql`CASE ${readingPriorities.level} WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END`;
+
+export interface PriorityRow {
+  priority: typeof readingPriorities.$inferSelect;
+  bookId: number;
+  title: string;
+  pages: number | null;
+  readingStatus: string | null;
+  currentPage: number | null;
+  authors: string | null;
+  coverUrl: string | null;
+}
+
+export async function listPriorities(
+  database: AnyDb,
+  opts: { status?: "active" | "completed" | "cancelled" | "all" } = {},
+): Promise<PriorityRow[]> {
+  const status = opts.status ?? "active";
+  const rows = await database
+    .select({
+      priority: readingPriorities,
+      bookId: books.bookId,
+      title: books.title,
+      pages: books.pages,
+      readingStatus: sql<string | null>`(SELECT rl.status FROM reading_log rl WHERE rl.book_id = ${books.bookId})`,
+      currentPage: sql<number | null>`(SELECT rl.current_page FROM reading_log rl WHERE rl.book_id = ${books.bookId})`,
+      authors: sql<string | null>`(SELECT string_agg(a.name, ', ' ORDER BY ba.author_order) FROM book_authors ba JOIN authors a ON a.author_id = ba.author_id WHERE ba.book_id = ${books.bookId})`,
+      coverUrl: sql<string | null>`(SELECT g.cover_url FROM goodreads_data g WHERE g.book_id = ${books.bookId})`,
+    })
+    .from(readingPriorities)
+    .innerJoin(books, eq(readingPriorities.bookId, books.bookId))
+    .where(status === "all" ? undefined : eq(readingPriorities.status, status))
+    .orderBy(asc(LEVEL_RANK), sql`${readingPriorities.targetDate} ASC NULLS LAST`, asc(readingPriorities.priorityId));
+  return rows as PriorityRow[];
 }
 
 // ============================================================================
@@ -276,4 +316,115 @@ export async function listWeeklyReviews(database: AnyDb, limit = 12) {
   return database.select().from(weeklyReadingReviews).orderBy(desc(weeklyReadingReviews.weekStart)).limit(limit) as Promise<
     (typeof weeklyReadingReviews.$inferSelect)[]
   >;
+}
+
+// ============================================================================
+// READING FOCUS (dashboard)
+// ============================================================================
+
+export type AttentionKind = "past_target" | "priority_book_finished" | "stalled" | "waiting_plans";
+
+export interface AttentionItem {
+  kind: AttentionKind;
+  bookId?: number;
+  title?: string;
+  message: string;
+}
+
+export interface ReadingFocus {
+  today: string;
+  /** Top active priorities, most important first. */
+  priorities: PriorityRow[];
+  todayItems: PlannerItem[];
+  weekendItems: PlannerItem[];
+  weekend: [string, string];
+  week: { plannedPages: number; actualPages: number; completionPct: number | null; activities: WeekSummary["activities"] };
+  reading: WeekSummary["activeReading"];
+  /** Sessions this week not tied to a plan item (candidates for "link existing session"). */
+  unlinkedSessions: PlannerSession[];
+  attention: AttentionItem[];
+}
+
+const STALLED_DAYS = 14;
+
+/** Everything the dashboard's "Your reading focus" section shows, in one round trip. */
+export async function getReadingFocus(database: AnyDb, today: string): Promise<ReadingFocus> {
+  if (!isDateKey(today)) throw new BookInputError("today must be a valid YYYY-MM-DD date");
+  const weekStart = weekStartKey(today);
+  const weekEnd = addDays(weekStart, 6);
+  const weekend: [string, string] = [addDays(weekStart, 5), addDays(weekStart, 6)];
+
+  const [summary, range, activePriorities, recentPast] = await Promise.all([
+    getWeekSummary(database, weekStart),
+    getPlannerRange(database, weekStart, weekEnd),
+    listPriorities(database, { status: "active" }),
+    getPlannerRange(database, addDays(today, -7), addDays(today, -1)),
+  ]);
+
+  const attention: AttentionItem[] = [];
+
+  for (const p of activePriorities) {
+    if (p.readingStatus === "finished") {
+      attention.push({
+        kind: "priority_book_finished",
+        bookId: p.bookId,
+        title: p.title,
+        message: `You finished ${p.title}. Mark its priority completed?`,
+      });
+    } else if (p.priority.targetDate && p.priority.targetDate < today) {
+      attention.push({
+        kind: "past_target",
+        bookId: p.bookId,
+        title: p.title,
+        message: `${p.title} is past its target date. Adjust the date or the plan?`,
+      });
+    }
+  }
+
+  const reading = await database
+    .select({
+      bookId: books.bookId,
+      title: books.title,
+      started: sql<string | null>`${readingLog.dateStarted}::text`,
+      last: sql<string | null>`(SELECT max(s.session_date)::text FROM reading_sessions s WHERE s.book_id = ${books.bookId})`,
+    })
+    .from(readingLog)
+    .innerJoin(books, eq(readingLog.bookId, books.bookId))
+    .where(eq(readingLog.status, "reading"));
+  for (const r of reading as { bookId: number; title: string; started: string | null; last: string | null }[]) {
+    const since = r.last ?? r.started;
+    if (since && daysBetween(since, today) >= STALLED_DAYS) {
+      attention.push({
+        kind: "stalled",
+        bookId: r.bookId,
+        title: r.title,
+        message: `${r.title} has not been touched for ${daysBetween(since, today)} days.`,
+      });
+    }
+  }
+
+  const waiting = recentPast.items.filter((i) => i.item.status === "planned");
+  if (waiting.length > 0) {
+    attention.push({
+      kind: "waiting_plans",
+      message: `${waiting.length} planned ${waiting.length === 1 ? "activity" : "activities"} from the past week ${waiting.length === 1 ? "is" : "are"} still open. Log, move or skip ${waiting.length === 1 ? "it" : "them"}.`,
+    });
+  }
+
+  return {
+    today,
+    priorities: activePriorities.slice(0, 3),
+    todayItems: range.items.filter((i) => i.item.scheduledDate === today && i.item.status !== "rescheduled"),
+    weekendItems: range.items.filter((i) => weekend.includes(i.item.scheduledDate) && i.item.status !== "rescheduled"),
+    weekend,
+    week: {
+      plannedPages: summary.pages.planned,
+      actualPages: summary.pages.actualFromPlans,
+      completionPct: summary.pages.completionPct,
+      activities: summary.activities,
+    },
+    reading: summary.activeReading,
+    unlinkedSessions: range.sessions.filter((s) => s.linkedItemId === null),
+    attention,
+  };
 }

@@ -15,7 +15,7 @@ import { computeLogUpdate } from "./reading-progress";
 import { addDays, isDateKey, weekStartKey, weekdayIndex } from "@/lib/dates";
 import { getWeekSummary } from "./planning-reads";
 
-export { getPriorityChanges, type PriorityChange } from "./planning-reads";
+export { getPriorityChanges, listPriorities, type PriorityChange, type PriorityRow } from "./planning-reads";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDb = any;
@@ -125,42 +125,6 @@ export async function closePriority(database: AnyDb, bookId: number, status: "co
 
 export const completePriority = (database: AnyDb, bookId: number) => closePriority(database, bookId, "completed");
 export const cancelPriority = (database: AnyDb, bookId: number) => closePriority(database, bookId, "cancelled");
-
-const LEVEL_RANK = sql`CASE ${readingPriorities.level} WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END`;
-
-export interface PriorityRow {
-  priority: typeof readingPriorities.$inferSelect;
-  bookId: number;
-  title: string;
-  pages: number | null;
-  readingStatus: string | null;
-  currentPage: number | null;
-  authors: string | null;
-  coverUrl: string | null;
-}
-
-export async function listPriorities(
-  database: AnyDb,
-  opts: { status?: "active" | "completed" | "cancelled" | "all" } = {},
-): Promise<PriorityRow[]> {
-  const status = opts.status ?? "active";
-  const rows = await database
-    .select({
-      priority: readingPriorities,
-      bookId: books.bookId,
-      title: books.title,
-      pages: books.pages,
-      readingStatus: sql<string | null>`(SELECT rl.status FROM reading_log rl WHERE rl.book_id = ${books.bookId})`,
-      currentPage: sql<number | null>`(SELECT rl.current_page FROM reading_log rl WHERE rl.book_id = ${books.bookId})`,
-      authors: sql<string | null>`(SELECT string_agg(a.name, ', ' ORDER BY ba.author_order) FROM book_authors ba JOIN authors a ON a.author_id = ba.author_id WHERE ba.book_id = ${books.bookId})`,
-      coverUrl: sql<string | null>`(SELECT g.cover_url FROM goodreads_data g WHERE g.book_id = ${books.bookId})`,
-    })
-    .from(readingPriorities)
-    .innerJoin(books, eq(readingPriorities.bookId, books.bookId))
-    .where(status === "all" ? undefined : eq(readingPriorities.status, status))
-    .orderBy(asc(LEVEL_RANK), sql`${readingPriorities.targetDate} ASC NULLS LAST`, asc(readingPriorities.priorityId));
-  return rows as PriorityRow[];
-}
 
 // ============================================================================
 // READING PLANS

@@ -14,7 +14,7 @@ test("MCP server exposes Goodreads tools and validates lookup_book input", async
 
   const { tools } = await client.listTools();
   const names = tools.map((t) => t.name);
-  for (const n of ["lookup_book", "refresh_goodreads_data", "get_reading_recommendations", "add_book", "update_book", "update_book_details", "add_book_authors", "add_book_genres", "add_author", "add_genre", "get_book_link", "delete_book", "delete_quote", "delete_reading_session", "update_quote", "update_reading_session", "set_reading_goal", "get_reading_goal", "get_yearly_stats", "get_monthly_stats", "get_top_rated_books", "get_reading_history", "list_reading_priorities", "set_book_priority", "close_book_priority", "list_reading_plan", "plan_reading", "complete_plan_item", "reschedule_plan_item", "skip_plan_item", "remove_plan_item", "get_weekly_review", "save_weekly_review", "update_recommendation"]) {
+  for (const n of ["lookup_book", "refresh_goodreads_data", "get_reading_recommendations", "add_book", "update_book", "update_book_details", "add_book_authors", "add_book_genres", "add_author", "add_genre", "get_book_link", "delete_book", "delete_quote", "delete_reading_session", "update_quote", "update_reading_session", "set_reading_goal", "get_reading_goal", "get_yearly_stats", "get_monthly_stats", "get_top_rated_books", "get_reading_history", "list_reading_priorities", "set_book_priority", "close_book_priority", "list_reading_plan", "plan_reading", "complete_plan_item", "reschedule_plan_item", "skip_plan_item", "remove_plan_item", "get_weekly_review", "save_weekly_review", "update_recommendation", "get_reading_focus"]) {
     expect(names).toContain(n);
   }
   const lookup = tools.find((t) => t.name === "lookup_book")!;

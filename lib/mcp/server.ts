@@ -23,7 +23,7 @@ import {
   setPriority,
   skipPlanItem,
 } from "@/lib/db/planning-writes";
-import { getPlannerRange, getWeekSummary } from "@/lib/db/planning-reads";
+import { getPlannerRange, getReadingFocus, getWeekSummary } from "@/lib/db/planning-reads";
 import { addDays, todayInTimezone, weekStartKey } from "@/lib/dates";
 import {
   searchBooks,
@@ -853,6 +853,18 @@ export function createMcpServer() {
         }
         return { success: true, ...(await restoreRecommendation(db, bookId)) };
       }),
+  );
+
+  server.registerTool(
+    "get_reading_focus",
+    {
+      title: "Reading focus",
+      description:
+        "The 'what matters now' snapshot: top priorities, today's plan, this weekend's plan, weekly page progress, books being read, and things needing attention (past target dates, stalled books, open past plans, priorities on already-finished books). Use it to answer 'what should I read today?'.",
+      inputSchema: { today: dateStr.optional().describe("Default: today in the app's timezone") },
+      annotations: READ,
+    },
+    async ({ today }) => run(() => getReadingFocus(db, today ?? todayInTimezone())),
   );
 
   return server;

@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { db } from "@/lib/db";
 import { BookInputError } from "@/lib/db/book-writes";
-import { getPlannerRange, getWeekSummary, listWeeklyReviews } from "@/lib/db/planning-reads";
+import { getPlannerRange, getReadingFocus, getWeekSummary, listWeeklyReviews } from "@/lib/db/planning-reads";
 import {
   addPlanItems,
   cancelPriority,
@@ -134,3 +134,8 @@ export const postponeRecommendationAction = createServerFn({ method: "POST" })
 export const restoreRecommendationAction = createServerFn({ method: "POST" })
   .validator((d: { bookId: number }) => d)
   .handler(({ data }) => wrap(() => restoreRecommendation(db, data.bookId)));
+
+// ------------------------------------------------------------- reading focus
+export const getReadingFocusAction = createServerFn({ method: "GET" })
+  .validator((d: { today: string }) => d)
+  .handler(({ data }) => wrap(() => getReadingFocus(db, data.today)));
