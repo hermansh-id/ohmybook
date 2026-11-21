@@ -20,6 +20,8 @@ export interface AddBookInput {
   /** Author names: reused if they exist (case-insensitive), created otherwise. */
   authors?: string[];
   genreIds?: number[];
+  /** Genre names: reused if they exist (case-insensitive), created otherwise. */
+  genres?: string[];
   coverUrl?: string;
   description?: string;
   publisher?: string;

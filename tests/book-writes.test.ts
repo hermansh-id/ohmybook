@@ -6,6 +6,7 @@ import { count, sql } from "drizzle-orm";
 import * as schema from "@/lib/db/schema";
 import {
   BookInputError,
+  attachAuthorsGenres,
   createBookWithAuthors,
   normalizeAuthorName,
   planAuthors,
@@ -139,13 +140,30 @@ describe("createBookWithAuthors", () => {
   });
 
   test("rollback: failure after author creation leaves no author, book or link", async () => {
-    // genre 9999 does not exist -> FK violation at the last statement
+    // publisher > varchar(255) makes the LAST statement fail, after the author and book were written
     await expect(
-      createBookWithAuthors(db, { title: "Doomed", authors: ["Ghost Author"], genreIds: [9999] }),
+      createBookWithAuthors(db, { title: "Doomed", authors: ["Ghost Author"], publisher: "x".repeat(300) }),
     ).rejects.toThrow();
     expect(await total(authors)).toBe(0);
     expect(await total(books)).toBe(0);
     expect(await total(bookAuthors)).toBe(0);
+  });
+
+  test("genre names: reused case-insensitively or created, first is primary", async () => {
+    const [g] = await db.insert(genres).values({ genreName: "Sejarah" }).returning();
+    const book = await createBookWithAuthors(db, { title: "G", authors: ["A"], genres: ["sejarah", "Politik", "  POLITIK "] });
+    expect(book.genres.map((x: { name: string }) => x.name).sort()).toEqual(["Politik", "Sejarah"]);
+    const primary = book.genres.find((x: { isPrimary: boolean }) => x.isPrimary);
+    expect(primary.genreId).toBe(g.genreId);
+    expect((await db.select({ n: count() }).from(genres))[0].n).toBe(2);
+  });
+
+  test("unknown genreId is rejected before any write", async () => {
+    await expect(
+      createBookWithAuthors(db, { title: "Bad", authors: ["Would Be New"], genreIds: [9999] }),
+    ).rejects.toBeInstanceOf(BookInputError);
+    expect(await total(authors)).toBe(0);
+    expect(await total(books)).toBe(0);
   });
 
   test("unknown authorId is rejected before any write", async () => {
@@ -158,5 +176,24 @@ describe("createBookWithAuthors", () => {
 
   test("empty title is rejected", async () => {
     await expect(createBookWithAuthors(db, { title: "   ", authors: ["X"] })).rejects.toBeInstanceOf(BookInputError);
+  });
+});
+
+describe("attachAuthorsGenres", () => {
+  test("adds authors/genres to an existing book, idempotent, keeps order", async () => {
+    const book = await createBookWithAuthors(db, { title: "Base", authors: ["First"], genres: ["One"] });
+    const r1 = await attachAuthorsGenres(db, book.bookId, { authors: ["second", "FIRST"], genres: ["one", "Two"] });
+    expect(r1.authors.map((a: { name: string }) => a.name)).toEqual(["First", "second"]);
+    expect(r1.genres.map((g: { name: string }) => g.name)).toEqual(["One", "Two"]);
+    expect(r1.genres.filter((g: { isPrimary: boolean }) => g.isPrimary)).toHaveLength(1);
+    const r2 = await attachAuthorsGenres(db, book.bookId, { authors: ["Second"], genres: ["two"] });
+    expect(r2.authors).toHaveLength(2);
+    expect(r2.genres).toHaveLength(2);
+  });
+
+  test("errors: unknown book, nothing to add", async () => {
+    await expect(attachAuthorsGenres(db, 999, { authors: ["X"] })).rejects.toBeInstanceOf(BookInputError);
+    const book = await createBookWithAuthors(db, { title: "B2" });
+    await expect(attachAuthorsGenres(db, book.bookId, {})).rejects.toBeInstanceOf(BookInputError);
   });
 });

@@ -14,12 +14,21 @@ test("MCP server exposes Goodreads tools and validates lookup_book input", async
 
   const { tools } = await client.listTools();
   const names = tools.map((t) => t.name);
-  for (const n of ["lookup_book", "refresh_goodreads_data", "get_reading_recommendations", "add_book", "update_book"]) {
+  for (const n of ["lookup_book", "refresh_goodreads_data", "get_reading_recommendations", "add_book", "update_book", "update_book_details", "add_book_authors", "add_book_genres", "add_author", "add_genre", "get_book_link", "delete_book", "delete_quote", "delete_reading_session", "update_quote", "update_reading_session", "set_reading_goal", "get_reading_goal", "get_yearly_stats", "get_monthly_stats", "get_top_rated_books", "get_reading_history"]) {
     expect(names).toContain(n);
   }
   const lookup = tools.find((t) => t.name === "lookup_book")!;
   expect(lookup.annotations?.readOnlyHint).toBe(true);
   expect(lookup.annotations?.openWorldHint).toBe(true);
+
+  // destructive tools are flagged; delete_book needs explicit confirm
+  for (const n of ["delete_book", "delete_quote", "delete_reading_session"]) {
+    expect(tools.find((t) => t.name === n)!.annotations?.destructiveHint).toBe(true);
+  }
+  const del = await client.callTool({ name: "delete_book", arguments: { bookId: 1 } });
+  expect(del.isError).toBe(true); // confirm missing -> schema validation error, no DB access
+  const noArg = await client.callTool({ name: "get_book_link", arguments: {} });
+  expect(noArg.isError).toBe(true);
 
   // none / more than one identifier -> error, no network call
   for (const args of [{}, { isbn: "1", qrcbn: "2" }]) {
