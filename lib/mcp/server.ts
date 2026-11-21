@@ -13,6 +13,9 @@ import {
   completePlanItem,
   createPlanWithItems,
   deletePlanItem,
+  dismissRecommendation,
+  postponeRecommendation,
+  restoreRecommendation,
   getPriorityChanges,
   listPriorities,
   reschedulePlanItem,
@@ -287,14 +290,14 @@ export function createMcpServer() {
     {
       title: "Reading recommendations",
       description:
-        "Top 10 unread/in-progress books from the library, ranked by Goodreads rating, popularity, length and time in library.",
-      inputSchema: {},
+        "A short list (max 5) of what to read next, each with the reasons. Considers your priorities and target dates, books in progress, how long a book has waited, genre variety, length fit (weekend vs weekday), your past ratings and what is already planned this week. Goodreads popularity is only a tie-breaker. Finished books are not suggested unless includeFinished is true (rereads). Dismissed/postponed books are skipped.",
+      inputSchema: {
+        includeFinished: z.boolean().optional().describe("Suggest rereads instead of unread books"),
+        mode: z.enum(["weekday", "weekend"]).optional().describe("Default: from today's day of the week"),
+      },
       annotations: READ,
     },
-    async () => {
-      const recs = await getReadingRecommendations();
-      return json(recs.map((r: { id: number; title: string }) => ({ ...r, bookId: r.id })));
-    },
+    async ({ includeFinished, mode }) => json(await getReadingRecommendations({ includeFinished, mode })),
   );
 
   server.registerTool(
@@ -827,6 +830,29 @@ export function createMcpServer() {
     },
     async ({ weekStart, ...rest }) =>
       run(async () => ({ success: true, review: await saveWeeklyReview(db, { weekStart: weekStart ?? todayInTimezone(), ...rest }) })),
+  );
+
+  server.registerTool(
+    "update_recommendation",
+    {
+      title: "Dismiss or postpone a recommendation",
+      description:
+        "'dismiss' = never suggest this book again; 'postpone' = hide it for N days (default 7); 'restore' = undo either. Only when the user asks.",
+      inputSchema: {
+        bookId: z.number().int(),
+        action: z.enum(["dismiss", "postpone", "restore"]),
+        days: z.number().int().min(1).max(365).optional().describe("For postpone. Default 7"),
+      },
+      annotations: IDEMPOTENT_WRITE,
+    },
+    async ({ bookId, action, days }) =>
+      run(async () => {
+        if (action === "dismiss") return { success: true, dismissal: await dismissRecommendation(db, bookId) };
+        if (action === "postpone") {
+          return { success: true, dismissal: await postponeRecommendation(db, bookId, addDays(todayInTimezone(), days ?? 7)) };
+        }
+        return { success: true, ...(await restoreRecommendation(db, bookId)) };
+      }),
   );
 
   return server;

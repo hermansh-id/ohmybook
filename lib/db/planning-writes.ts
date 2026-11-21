@@ -7,6 +7,7 @@ import {
   readingPriorities,
   readingPriorityHistory,
   readingSessions,
+  recommendationDismissals,
   weeklyReadingReviews,
 } from "./schema";
 import { BookInputError, runAtomic } from "./book-writes";
@@ -599,4 +600,34 @@ export async function saveWeeklyReview(database: AnyDb, input: SaveWeeklyReviewI
     })
     .returning();
   return saved as typeof weeklyReadingReviews.$inferSelect;
+}
+
+// ============================================================================
+// RECOMMENDATION DISMISSALS ("Not now" / "Dismiss")
+// ============================================================================
+
+async function setDismissal(database: AnyDb, bookId: number, kind: "dismissed" | "postponed", untilDate: string | null) {
+  await requireBook(database, bookId);
+  const [row] = await database
+    .insert(recommendationDismissals)
+    .values({ bookId, kind, untilDate })
+    .onConflictDoUpdate({ target: recommendationDismissals.bookId, set: { kind, untilDate, createdAt: new Date() } })
+    .returning();
+  return row as typeof recommendationDismissals.$inferSelect;
+}
+
+/** Never suggest this book again (until restored). */
+export const dismissRecommendation = (database: AnyDb, bookId: number) => setDismissal(database, bookId, "dismissed", null);
+
+/** Hide this book from suggestions until `untilDate`. */
+export async function postponeRecommendation(database: AnyDb, bookId: number, untilDate: string) {
+  if (!isDateKey(untilDate)) throw new BookInputError("untilDate must be a valid YYYY-MM-DD date");
+  return setDismissal(database, bookId, "postponed", untilDate);
+}
+
+/** Undo a dismiss/postpone. */
+export async function restoreRecommendation(database: AnyDb, bookId: number) {
+  await requireBook(database, bookId);
+  await database.delete(recommendationDismissals).where(eq(recommendationDismissals.bookId, bookId));
+  return { bookId };
 }

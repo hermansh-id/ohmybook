@@ -58,10 +58,13 @@ export function CreatePlanDialog({
   open,
   onOpenChange,
   defaultDate,
+  defaultBookId = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultDate: string;
+  /** Preselect a book (e.g. from a recommendation). */
+  defaultBookId?: number | null;
 }) {
   const add = useAddPlanItems();
   const [bookId, setBookId] = React.useState<number | null>(null);
@@ -78,7 +81,7 @@ export function CreatePlanDialog({
 
   React.useEffect(() => {
     if (!open) return;
-    setBookId(null);
+    setBookId(defaultBookId);
     setDate(defaultDate);
     setTime("anytime");
     setPages("");
@@ -89,7 +92,7 @@ export function CreatePlanDialog({
     setRepeat(false);
     setWeekdays([]);
     setWeeks("4");
-  }, [open, defaultDate]);
+  }, [open, defaultDate, defaultBookId]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

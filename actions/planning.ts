@@ -9,10 +9,13 @@ import {
   completePriority,
   createPlanWithItems,
   deletePlanItem,
+  dismissRecommendation,
   getPriorityChanges,
   listPriorities,
+  postponeRecommendation,
   reopenPlanItem,
   reschedulePlanItem,
+  restoreRecommendation,
   saveWeeklyReview,
   setPriority,
   skipPlanItem,
@@ -118,3 +121,16 @@ export const getWeeklyReviewsAction = createServerFn({ method: "GET" })
 export const saveWeeklyReviewAction = createServerFn({ method: "POST" })
   .validator((d: SaveWeeklyReviewInput) => d)
   .handler(({ data }) => wrap(() => saveWeeklyReview(db, data)));
+
+// ------------------------------------------------------------ recommendations
+export const dismissRecommendationAction = createServerFn({ method: "POST" })
+  .validator((d: { bookId: number }) => d)
+  .handler(({ data }) => wrap(() => dismissRecommendation(db, data.bookId)));
+
+export const postponeRecommendationAction = createServerFn({ method: "POST" })
+  .validator((d: { bookId: number; untilDate: string }) => d)
+  .handler(({ data }) => wrap(() => postponeRecommendation(db, data.bookId, data.untilDate)));
+
+export const restoreRecommendationAction = createServerFn({ method: "POST" })
+  .validator((d: { bookId: number }) => d)
+  .handler(({ data }) => wrap(() => restoreRecommendation(db, data.bookId)));

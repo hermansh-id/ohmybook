@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { addDays, fromDateKey, toDateKey, weekDays, weekStartKey } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import type { PlannerItem, PlannerRange } from "@/lib/db/planning-reads";
-import { PlanItemCard } from "./plan-item-card";
+import { PlanItemCard } from "@/components/planning/plan-item-card";
 
 export interface ItemHandlers {
   onComplete: (row: PlannerItem) => void;

@@ -2,19 +2,23 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { getReadingRecommendationsAction } from "@/actions/books";
 import {
   addPlanItemsAction,
   cancelPriorityAction,
   completePlanItemAction,
   completePriorityAction,
   deletePlanItemAction,
+  dismissRecommendationAction,
   getPlannerRangeAction,
   getPrioritiesAction,
   getPriorityChangesAction,
   getWeekSummaryAction,
   getWeeklyReviewsAction,
+  postponeRecommendationAction,
   reopenPlanItemAction,
   reschedulePlanItemAction,
+  restoreRecommendationAction,
   saveWeeklyReviewAction,
   setPriorityAction,
   skipPlanItemAction,
@@ -148,3 +152,19 @@ export const useSaveWeeklyReview = () =>
   usePlanningMutation((vars: Vars<typeof saveWeeklyReviewAction>) => saveWeeklyReviewAction({ data: vars }), {
     success: "Review saved",
   });
+
+// ------------------------------------------------------------ recommendations
+export function useRecommendations(opts: { today: string; includeFinished?: boolean }) {
+  return useQuery({
+    queryKey: ["recommendations", opts.today, !!opts.includeFinished],
+    queryFn: () => getReadingRecommendationsAction({ data: opts }),
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+export const useDismissRecommendation = () =>
+  usePlanningMutation((vars: Vars<typeof dismissRecommendationAction>) => dismissRecommendationAction({ data: vars }));
+export const usePostponeRecommendation = () =>
+  usePlanningMutation((vars: Vars<typeof postponeRecommendationAction>) => postponeRecommendationAction({ data: vars }));
+export const useRestoreRecommendation = () =>
+  usePlanningMutation((vars: Vars<typeof restoreRecommendationAction>) => restoreRecommendationAction({ data: vars }));

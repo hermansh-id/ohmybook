@@ -11,7 +11,7 @@ import {
   getReadingRecommendations,
   refreshGoodreadsData,
 } from "@/lib/server/books";
-import type { AddBookInput, BookLookupResult } from "@/lib/server/books";
+import type { AddBookInput, BookLookupResult, RecommendationOptionsInput } from "@/lib/server/books";
 
 export type { AddBookInput, BookLookupResult };
 
@@ -250,7 +250,8 @@ export const lookupBookByQRCBN = createServerFn({ method: "POST" })
   .handler(({ data }) => lookupQrcbn(data.code));
 
 export const getReadingRecommendationsAction = createServerFn({ method: "GET" })
-  .handler(() => getReadingRecommendations());
+  .validator((d: RecommendationOptionsInput | undefined) => d ?? {})
+  .handler(({ data }) => getReadingRecommendations(data));
 
 export const lookupBookByGoodreadsUrl = createServerFn({ method: "POST" })
   .validator((d: { url: string }) => d)

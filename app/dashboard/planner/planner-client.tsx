@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { addDays, fromDateKey, toDateKey, weekStartKey } from "@/lib/dates";
 import { usePlanner } from "@/lib/queries/planning";
 import type { PlannerItem } from "@/lib/db/planning-reads";
-import { CompleteItemDialog, CreatePlanDialog, EditItemDialog, RescheduleDialog, WeekendPlanDialog } from "./plan-dialogs";
+import { CompleteItemDialog, CreatePlanDialog, EditItemDialog, RescheduleDialog, WeekendPlanDialog } from "@/components/planning/plan-dialogs";
 import { ListView, MonthView, WeekView } from "./planner-views";
 
 type View = "list" | "week" | "month";

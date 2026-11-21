@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { getAllBooksWithDetails } from "@/lib/db/queries";
+import { getRecommendations } from "@/lib/db/recommendation-reads";
+import { todayInTimezone } from "@/lib/dates";
 import { books, goodreadsData } from "@/lib/db/schema";
 import { eq, or, sql } from "drizzle-orm";
 import * as cheerio from "cheerio";
@@ -473,95 +474,36 @@ export async function lookupGoodreadsUrl(url: string): Promise<BookLookupResult>
 }
 
 
-export async function getReadingRecommendations() {
+export interface RecommendationOptionsInput {
+  /** The user's today as YYYY-MM-DD (the browser passes its local date). */
+  today?: string;
+  mode?: "weekday" | "weekend";
+  /** Suggest rereads instead of unread books. */
+  includeFinished?: boolean;
+  limit?: number;
+}
+
+/**
+ * Explained reading suggestions. Scoring lives in lib/recommendations.ts; this
+ * adds the fields the recommendations page and MCP tool already used.
+ */
+export async function getReadingRecommendations(opts: RecommendationOptionsInput = {}) {
   try {
-    const allBooks = await getAllBooksWithDetails();
-
-    // Group by book and aggregate data
-    const bookMap = new Map();
-
-    allBooks.forEach((row) => {
-      const bookId = row.book.bookId;
-
-      if (!bookMap.has(bookId)) {
-        bookMap.set(bookId, {
-          id: bookId,
-          title: row.book.title,
-          isbn: row.book.isbn,
-          year: row.book.year,
-          pages: row.book.pages,
-          addedAt: row.book.addedAt,
-          authors: [],
-          genres: [],
-          status: row.readingStatus?.status || "not_started",
-          rating: row.readingStatus?.rating || null,
-          coverUrl: row.goodreads?.coverUrl || null,
-          averageRating: row.goodreads?.averageRating || null,
-          ratingsCount: row.goodreads?.ratingsCount || null,
-          description: row.goodreads?.description || null,
-        });
-      }
-
-      const book = bookMap.get(bookId);
-
-      if (row.author && !book.authors.some((a: any) => a.name === row.author?.name)) {
-        book.authors.push({
-          id: row.author.authorId,
-          name: row.author.name,
-        });
-      }
-
-      if (row.genre && !book.genres.some((g: any) => g.name === row.genre?.genreName)) {
-        book.genres.push({
-          id: row.genre.genreId,
-          name: row.genre.genreName,
-        });
-      }
+    const recs = await getRecommendations(db, {
+      today: opts.today ?? todayInTimezone(),
+      mode: opts.mode,
+      includeFinished: opts.includeFinished,
+      limit: opts.limit,
     });
-
-    const booksArray = Array.from(bookMap.values());
-
-    // Filter unread books (not_started or reading)
-    const unreadBooks = booksArray.filter(
-      (book) => book.status === "not_started" || book.status === "reading"
-    );
-
-    // Calculate recommendation scores
-    const recommendations = unreadBooks.map((book) => {
-      let score = 0;
-
-      // Prioritize books currently reading
-      if (book.status === "reading") score += 100;
-
-      // Higher Goodreads rating = higher score
-      if (book.averageRating) {
-        score += parseFloat(book.averageRating.toString()) * 10;
-      }
-
-      // More ratings = more popular = higher score
-      if (book.ratingsCount) {
-        score += Math.min(book.ratingsCount / 100, 20); // Cap at 20 points
-      }
-
-      // Shorter books get slightly higher score (easier to finish)
-      if (book.pages) {
-        score += Math.max(0, (500 - book.pages) / 100);
-      }
-
-      // Older books in library (should read soon)
-      if (book.addedAt) {
-        const daysInLibrary = (Date.now() - new Date(book.addedAt).getTime()) / (1000 * 60 * 60 * 24);
-        score += Math.min(daysInLibrary / 10, 15); // Cap at 15 points
-      }
-
-      return { ...book, recommendationScore: score };
-    });
-
-    // Sort by recommendation score
-    recommendations.sort((a, b) => b.recommendationScore - a.recommendationScore);
-
-    // Return top 10 recommendations
-    return recommendations.slice(0, 10);
+    return recs.map((r) => ({
+      ...r,
+      id: r.bookId,
+      status: r.status ?? "not_started",
+      rating: r.userRating,
+      averageRating: r.goodreadsRating,
+      ratingsCount: r.goodreadsRatingsCount,
+      recommendationScore: r.score,
+    }));
   } catch (error) {
     console.error("Error getting recommendations:", error);
     return [];
